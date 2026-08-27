@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: unu-frontend
+    runtime: static
+    # Si el repositorio de Git tiene la carpeta `frontend` dentro de otra raíz,
+    # descomenta la siguiente línea:
+    # rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22.17.0"
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      # SPA fallback: cualquier ruta desconocida sirve index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
