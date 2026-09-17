@@ -1,0 +1,157 @@
+import type { LucideIcon } from "lucide-react"
+import { GlobeIcon, MailIcon, MapPinIcon, PhoneIcon } from "lucide-react"
+
+import { PanelTitle } from "@/components/resume/resume-section"
+import { Progress, ProgressLabel } from "@/components/ui/progress"
+import {
+  SHOW_REFERENCE_CONTACTS,
+  languages,
+  personalDetails,
+  profile,
+  references,
+} from "@/data/resume"
+
+// El CV declara el nivel con palabras; la barra solo lo representa.
+const NIVEL: Record<string, number> = { Nativo: 100, Intermedio: 55 }
+
+function Contacto({
+  icon: Icon,
+  children,
+  href,
+  note,
+}: {
+  icon: LucideIcon
+  children: React.ReactNode
+  href?: string
+  note?: string
+}) {
+  const externo = href?.startsWith("http")
+
+  return (
+    <li className="flex min-w-0 items-start gap-3">
+      <Icon className="mt-0.5 size-4 shrink-0" />
+      <div className="flex min-w-0 flex-col">
+        {href ? (
+          <a
+            href={href}
+            target={externo ? "_blank" : undefined}
+            rel={externo ? "noreferrer" : undefined}
+            className="rounded-sm break-words underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            {children}
+          </a>
+        ) : (
+          <span className="break-words">{children}</span>
+        )}
+        {note ? (
+          <span className="text-xs text-muted-foreground">{note}</span>
+        ) : null}
+      </div>
+    </li>
+  )
+}
+
+export function ResumeSidebar() {
+  return (
+    <aside className="flex flex-col gap-8 bg-sidebar px-6 py-8 sm:px-8 md:pt-28 lg:pt-32">
+      <section aria-labelledby="contacto-titulo" className="flex flex-col gap-4">
+        <PanelTitle>
+          <span id="contacto-titulo">Contacto</span>
+        </PanelTitle>
+        <ul className="flex flex-col gap-3 text-sm">
+          <Contacto
+            icon={PhoneIcon}
+            href={`tel:${profile.phone.replace(/\s/g, "")}`}
+          >
+            {profile.phone}
+          </Contacto>
+          <Contacto icon={MailIcon} href={`mailto:${profile.email}`}>
+            {profile.email}
+          </Contacto>
+          <Contacto
+            icon={GlobeIcon}
+            href={profile.website}
+            note={profile.websiteNote}
+          >
+            {profile.websiteLabel}
+          </Contacto>
+          <Contacto icon={MapPinIcon}>{profile.address}</Contacto>
+        </ul>
+      </section>
+
+      <section
+        aria-labelledby="informacion-titulo"
+        className="flex flex-col gap-4"
+      >
+        <PanelTitle>
+          <span id="informacion-titulo">Información</span>
+        </PanelTitle>
+        <dl className="flex flex-col gap-2 text-sm">
+          {personalDetails.map((dato) => (
+            <div key={dato.label} className="flex flex-col">
+              <dt className="text-xs text-muted-foreground">{dato.label}</dt>
+              <dd>{dato.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section aria-labelledby="idiomas-titulo" className="flex flex-col gap-4">
+        <PanelTitle>
+          <span id="idiomas-titulo">Idiomas</span>
+        </PanelTitle>
+        <div className="flex flex-col gap-4">
+          {languages.map((idioma) => (
+            <Progress
+              key={idioma.name}
+              value={NIVEL[idioma.level] ?? 0}
+              getAriaValueText={() => idioma.level}
+            >
+              <ProgressLabel className="text-sm font-semibold">
+                {idioma.name}
+              </ProgressLabel>
+              <span className="ml-auto text-sm text-muted-foreground">
+                {idioma.level}
+              </span>
+            </Progress>
+          ))}
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="referencias-titulo"
+        className="flex flex-col gap-4"
+      >
+        <PanelTitle>
+          <span id="referencias-titulo">Referencias</span>
+        </PanelTitle>
+        <ul className="flex flex-col gap-3 text-sm">
+          {references.map((referencia) => (
+            <li key={referencia.email} className="flex min-w-0 flex-col">
+              <span className="font-semibold">{referencia.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {referencia.relation}
+              </span>
+              {SHOW_REFERENCE_CONTACTS ? (
+                <span className="flex min-w-0 flex-col text-xs text-muted-foreground">
+                  <a
+                    href={`tel:${referencia.phone.replace(/[\s()]/g, "")}`}
+                    className="w-fit underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {referencia.phone}
+                  </a>
+                  <a
+                    href={`mailto:${referencia.email}`}
+                    className="truncate underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {referencia.email}
+                  </a>
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </aside>
+  )
+}

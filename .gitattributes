@@ -1,0 +1,6 @@
+# Los scripts de shell y el entrypoint del contenedor deben ir con saltos de
+# linea LF: con CRLF, Linux no encuentra el interprete y el contenedor muere
+# con un "not found" que no dice nada.
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf

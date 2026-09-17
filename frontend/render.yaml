@@ -2,15 +2,18 @@ services:
   - type: web
     name: unu-frontend
     runtime: static
-    # Si el repositorio de Git tiene la carpeta `frontend` dentro de otra raíz,
-    # descomenta la siguiente línea:
-    # rootDir: frontend
+    # La raiz del repo es `unu/`, que contiene `frontend/` y `backend/`.
+    rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: true
     envVars:
       - key: NODE_VERSION
         value: "22.17.0"
+      # URL publica del backend de Django que sirve /api/dashboard/.
+      # Se define en el panel de Render; sin ella el dashboard apunta a localhost.
+      - key: VITE_API_URL
+        sync: false
     headers:
       - path: /assets/*
         name: Cache-Control

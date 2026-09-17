@@ -1,0 +1,21 @@
+# Lo que no debe entrar a la imagen.
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+db.sqlite3
+
+# Secretos: las variables se inyectan en Render, nunca se copian a la imagen.
+.env
+.env.*
+!.env.example
+
+staticfiles/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.git/
+.gitignore
+*.md
+t.txt

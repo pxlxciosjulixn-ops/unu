@@ -1,47 +1,72 @@
-import { SparklesIcon } from "lucide-react"
+import { lazy, Suspense } from "react"
+import { Navigate, Route, Routes } from "react-router-dom"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { ChatProvider } from "@/components/chat/chat-context"
+import { ChatWidget } from "@/components/chat/chat-widget"
+import { ResumePage } from "@/components/resume/resume-page"
+import { SiteHeader } from "@/components/resume/site-header"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// El dashboard carga aparte: arrastra las graficas y no hace falta en la
+// pagina de la hoja de vida.
+const DashboardPage = lazy(() =>
+  import("@/components/dashboard/dashboard-page").then((m) => ({
+    default: m.DashboardPage,
+  }))
+)
+
+const ChatbotPage = lazy(() =>
+  import("@/components/chatbot/chatbot-page").then((m) => ({
+    default: m.ChatbotPage,
+  }))
+)
+
+function CargandoPagina() {
+  return (
+    <div className="flex min-h-svh flex-col gap-4 p-6">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-28 w-full" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  )
+}
+
+function ResumeScreen() {
+  return (
+    <ChatProvider>
+      <div className="min-h-svh bg-muted/40">
+        <SiteHeader />
+        <main className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8">
+          <ResumePage />
+        </main>
+        <ChatWidget />
+      </div>
+    </ChatProvider>
+  )
+}
 
 export function App() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6">
-      <Card className="mx-auto w-full max-w-sm">
-        <CardHeader>
-          <Badge variant="secondary" className="mb-2 w-fit">
-            <SparklesIcon data-icon="inline-start" />
-            unu
-          </Badge>
-          <CardTitle className="text-2xl">Hola 👋</CardTitle>
-          <CardDescription>
-            Bienvenido. Esta app corre con React, Vite y shadcn/ui.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Todo listo para empezar a construir. Agrega componentes y arma la
-            interfaz desde aquí.
-          </p>
-        </CardContent>
-        <CardFooter className="flex-col gap-2">
-          <Button className="w-full">Comenzar</Button>
-          <Button variant="outline" className="w-full">
-            Ver documentación
-          </Button>
-        </CardFooter>
-      </Card>
-      <p className="font-mono text-xs text-muted-foreground">
-        Presiona <kbd>d</kbd> para cambiar el tema
-      </p>
-    </div>
+    <Routes>
+      <Route path="/" element={<ResumeScreen />} />
+      <Route
+        path="/dashboard"
+        element={
+          <Suspense fallback={<CargandoPagina />}>
+            <DashboardPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/chatbot"
+        element={
+          <Suspense fallback={<CargandoPagina />}>
+            <ChatbotPage />
+          </Suspense>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
