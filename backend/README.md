@@ -171,8 +171,13 @@ migraciones.
 
 1. **New > Web Service**, conecta el repo y elige **Docker** como runtime.
 2. **Root Directory:** `backend` (el repo tiene `frontend/` y `backend/`).
-3. **Health Check Path:** `/api/health/`.
-4. Variables de entorno:
+3. **Dockerfile Path:** `./backend/Dockerfile`. Esa ruta se resuelve desde la
+   raiz del repo, no desde el Root Directory; si Render dice que no encuentra
+   el Dockerfile, prueba `./Dockerfile`.
+4. **Instance Type:** `Free`.
+5. **Health Check Path:** `/api/health/`.
+6. **Region:** la misma de la base (Oregon), o la URL interna no funciona.
+7. Variables de entorno:
 
    | Variable               | Valor                                                             |
    | ---------------------- | ----------------------------------------------------------------- |
@@ -187,7 +192,7 @@ migraciones.
 
    `PORT` y `RENDER_EXTERNAL_HOSTNAME` las pone Render; el proyecto ya las usa.
 
-5. En el **frontend**, define `VITE_API_URL` con la URL del backend y vuelve a
+8. En el **frontend**, define `VITE_API_URL` con la URL del backend y vuelve a
    desplegar: ese valor se incrusta al compilar, no se lee en tiempo de
    ejecucion.
 

@@ -11,9 +11,11 @@ services:
     name: unu-backend
     runtime: docker
     # La raiz del repo es `unu/`, que contiene `frontend/` y `backend/`.
+    # Ojo: `dockerfilePath` y `dockerContext` se resuelven desde la raiz del
+    # repo, no desde `rootDir` (el formulario de Render lo dice igual).
     rootDir: backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     plan: free
     region: oregon
     # El health check entra por HTTP interno; settings.py exime esta ruta del
