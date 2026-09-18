@@ -48,6 +48,10 @@ En Linux/macOS los comandos son `env/bin/python` en vez de `env/Scripts/python.e
 | ------ | -------------------------------- | ---------------------------------------------- |
 | GET    | `/api/health/`                   | Estado del servicio y de la base de datos      |
 | POST   | `/api/chat/`                     | Conversación con el modelo, en streaming (SSE) |
+| GET    | `/api/chat/conversations/`       | Historial del visitante                        |
+| GET    | `/api/chat/conversations/<id>/`  | Mensajes de una conversación                   |
+| DELETE | `/api/chat/conversations/<id>/`  | Borra una conversación                         |
+| DELETE | `/api/chat/conversations/clear/` | Borra todo el historial del visitante          |
 | GET    | `/api/dashboard/overview/`       | Todo el tablero en una sola llamada            |
 | GET    | `/api/dashboard/summary/`        | Indicadores del mes contra el mes anterior     |
 | GET    | `/api/dashboard/sales-series/`   | Meta, venta real y cumplimiento por mes        |
@@ -93,7 +97,7 @@ guarda en la petición para no repetirlo en cada sub-vista.
   "debug": true,
   "django": "6.1",
   "database": { "connected": true, "engine": "postgresql", "name": "unu" },
-  "integrations": { "nvidia": { "configured": true, "model": "deepseek-ai/..." } }
+  "integrations": { "nvidia": { "configured": true, "model": "moonshotai/kimi-k3" } }
 }
 ```
 
@@ -101,11 +105,15 @@ De las integraciones solo informa si la key **está configurada**, nunca su valo
 
 ## Chat con el modelo
 
-`POST /api/chat/` recibe la conversación y devuelve la respuesta en trozos:
+`POST /api/chat/` recibe un mensaje y devuelve la respuesta en trozos:
 
 ```json
-{ "messages": [{ "role": "user", "content": "Hola" }] }
+{ "message": "Hola", "conversation_id": "uuid opcional" }
 ```
+
+Sin `conversation_id` se crea una conversación nueva y su identificador llega
+en el evento `start`. El historial lo arma el servidor leyendo la base, no el
+navegador.
 
 La respuesta es un flujo `text/event-stream` con cuatro tipos de evento:
 `start` (trae el nombre del modelo), `delta` (un trozo de texto), `done` y
@@ -113,13 +121,44 @@ La respuesta es un flujo `text/event-stream` con cuatro tipos de evento:
 
 - La `NVIDIA_API_KEY` **nunca sale del servidor**: el navegador solo habla con
   este endpoint.
-- Va en streaming porque el modelo tarda entre 15 y 30 segundos en soltar la
-  primera palabra; es cola del proveedor, no del servidor.
-- El modo de razonamiento va **apagado** (`chat_template_kwargs.thinking =
-  false`): agregaba unos 10 segundos mas de espera sin mejorar la respuesta.
+- Va en streaming porque el modelo se demora en soltar la primera palabra.
+  Medido en el endpoint gratis de NVIDIA: entre 15 y 30 segundos en un dia
+  normal, y mas de 100 cuando la cola esta cargada. Es del proveedor, no del
+  servidor: un "hola" tarda lo mismo que una pregunta larga.
+- **Cambiar de modelo es solo cambiar `NVIDIA_MODEL`** en el entorno. Cada
+  familia nombra distinto lo del razonamiento y eso lo resuelve
+  `chat.services.parametros_del_modelo()`:
+  - Kimi: `reasoning_effort` (`low`, `high`, `max`). Se manda `low`.
+  - DeepSeek: `chat_template_kwargs.thinking`, que se apaga.
+
+  Un modelo que no reconozca el parametro lo ignora, asi que el peor caso es
+  quedarse con su comportamiento por defecto.
+- Cuando el modelo razona, el servidor manda un evento `thinking` en cuanto
+  llegan los primeros tokens de razonamiento. El razonamiento en si no se
+  muestra (es ruido), pero la pagina cambia el aviso a "Razonando…" para que se
+  vea que ya esta trabajando.
 - Limite de 20 peticiones por minuto y por IP (`DEFAULT_THROTTLE_RATES`), para
   que un endpoint publico no consuma la cuota de NVIDIA.
 - Se envian como maximo los ultimos 20 mensajes y 24.000 caracteres.
+
+### Historial y privacidad
+
+Las conversaciones y sus mensajes quedan guardados (app `chat`). Como no hay
+inicio de sesion, se agrupan por visitante usando su IP, que llega en
+`X-Forwarded-For` detras del proxy de Render.
+
+**En la base no se guarda la IP en claro**, sino un SHA-256 con la
+`DJANGO_SECRET_KEY` como sal. Sirve igual para reconocer al mismo visitante y
+evita almacenar un dato personal que nadie va a leer a mano. Dos consecuencias
+que conviene tener presentes:
+
+- Si cambia la `DJANGO_SECRET_KEY`, los visitantes dejan de ver su historial
+  anterior (el hash cambia).
+- Varias personas detras de la misma IP (una oficina, una red movil) comparten
+  historial. Para separarlas haria falta inicio de sesion o una cookie.
+
+La respuesta del modelo se guarda tambien si el visitante cierra la pestaña a
+mitad: lo que alcanzo a llegar queda registrado.
 
 ## Datos de prueba del dashboard
 
@@ -145,7 +184,10 @@ interfaz; `--reset` borra los anteriores antes de crear los nuevos. Opciones:
 | `DATABASE_URL`         | no               | Si está vacía se usa SQLite local                          |
 | `NVIDIA_API_KEY`       | no               | Para la integración con NVIDIA NIM / DeepSeek              |
 | `NVIDIA_BASE_URL`      | no               | Por defecto `https://integrate.api.nvidia.com/v1`          |
-| `NVIDIA_MODEL`         | no               | Por defecto `deepseek-ai/deepseek-v4-flash-0731`           |
+| `NVIDIA_MODEL`         | no               | Por defecto `moonshotai/kimi-k3`                           |
+| `NVIDIA_MAX_TOKENS`    | no               | Tope de la respuesta. Por defecto 4096                     |
+| `NVIDIA_TEMPERATURE`   | no               | Por defecto 0.7                                            |
+| `NVIDIA_REASONING_EFFORT` | no            | Solo Kimi: `low`, `high` o `max`. Por defecto `low`        |
 
 ## Base de datos
 
@@ -186,7 +228,7 @@ migraciones.
    | `DATABASE_URL`         | URL **interna** de la base (`dpg-...-a`, sin dominio)             |
    | `CORS_ALLOWED_ORIGINS` | La URL del frontend ya desplegado, ej. `https://algo.onrender.com` |
    | `NVIDIA_API_KEY`       | Tu key (solo aqui, nunca en el repo)                              |
-   | `NVIDIA_MODEL`         | `deepseek-ai/deepseek-v4-flash-0731`                              |
+   | `NVIDIA_MODEL`         | `moonshotai/kimi-k3`                                              |
    | `WEB_CONCURRENCY`      | `2`                                                               |
    | `GUNICORN_THREADS`     | `8`                                                               |
 

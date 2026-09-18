@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom"
 import { AppShell } from "@/components/app-shell"
 import { ComplianceChart } from "@/components/dashboard/compliance-chart"
 import { CountriesMap } from "@/components/dashboard/countries-map"
+import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { FiltersBar } from "@/components/dashboard/filters-bar"
 import {
   FILTROS_INICIALES,
@@ -64,6 +65,7 @@ export function DashboardPage() {
   return (
     <AppShell
       titulo="Dashboard"
+      sidebar={<DashboardSidebar />}
       acciones={
         <>
           {data?.summary ? (

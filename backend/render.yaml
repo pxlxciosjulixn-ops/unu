@@ -39,7 +39,7 @@ services:
       - key: NVIDIA_API_KEY
         sync: false
       - key: NVIDIA_MODEL
-        value: deepseek-ai/deepseek-v4-flash-0731
+        value: moonshotai/kimi-k3
       # Dos procesos con ocho hilos cada uno caben en el plan gratis y aguantan
       # las respuestas largas del chat.
       - key: WEB_CONCURRENCY

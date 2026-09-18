@@ -1,9 +1,8 @@
 import {
-  Bar,
+  Area,
+  AreaChart,
   CartesianGrid,
-  ComposedChart,
   Line,
-  ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts"
@@ -34,17 +33,16 @@ import {
 } from "@/lib/format"
 
 const config = {
-  target: { label: "Meta", color: "var(--chart-4)" },
   sales: { label: "Venta real", color: "var(--chart-1)" },
-  compliance: { label: "Cumplimiento", color: "var(--chart-2)" },
+  target: { label: "Meta", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
 export function ComplianceChart({ datos }: { datos: SerieVentas | null }) {
   const series =
     datos?.series.map((punto) => ({
       label: punto.label,
-      target: punto.target === null ? null : aNumero(punto.target),
       sales: aNumero(punto.sales),
+      target: punto.target === null ? null : aNumero(punto.target),
       compliance: punto.compliance_pct,
     })) ?? []
 
@@ -57,11 +55,11 @@ export function ComplianceChart({ datos }: { datos: SerieVentas | null }) {
   return (
     <Card id="ventas" className="scroll-mt-20">
       <CardHeader className="border-b">
-        <CardTitle>Cumplimiento de metas</CardTitle>
+        <CardTitle>Ventas contra meta</CardTitle>
         <CardDescription>
           {datos
             ? datos.targets_available
-              ? `Meta contra venta real · ${cumplidos} de ${conMeta.length} meses por encima del 100 %`
+              ? `${cumplidos} de ${conMeta.length} meses por encima de la meta`
               : "Las metas están definidas para el negocio completo, no por país: quita el filtro de país para ver el cumplimiento."
             : "Cargando…"}
         </CardDescription>
@@ -79,7 +77,21 @@ export function ComplianceChart({ datos }: { datos: SerieVentas | null }) {
       <CardContent className="pt-2">
         {datos ? (
           <ChartContainer config={config} className="aspect-auto h-[17rem] w-full">
-            <ComposedChart data={series} margin={{ left: 4, right: 4, top: 8 }}>
+            <AreaChart data={series} margin={{ left: 4, right: 4, top: 8 }}>
+              <defs>
+                <linearGradient id="area-ventas" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor="var(--color-sales)"
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--color-sales)"
+                    stopOpacity={0.02}
+                  />
+                </linearGradient>
+              </defs>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
@@ -89,65 +101,40 @@ export function ComplianceChart({ datos }: { datos: SerieVentas | null }) {
                 minTickGap={16}
               />
               <YAxis
-                yAxisId="pesos"
                 tickLine={false}
                 axisLine={false}
                 width={72}
                 tickFormatter={(valor: number) => formatearPesosCompacto(valor)}
               />
-              <YAxis
-                yAxisId="pct"
-                orientation="right"
-                tickLine={false}
-                axisLine={false}
-                width={44}
-                domain={[0, 140]}
-                tickFormatter={(valor: number) => `${valor} %`}
-              />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    formatter={(valor, nombre) =>
-                      nombre === "compliance"
-                        ? formatearPorcentaje(Number(valor))
-                        : formatearPesos(Number(valor))
-                    }
+                    formatter={(valor) => formatearPesos(Number(valor))}
                   />
                 }
               />
-              <Bar
-                yAxisId="pesos"
-                dataKey="target"
-                fill="var(--color-target)"
-                radius={[3, 3, 0, 0]}
-                isAnimationActive={false}
-              />
-              <Bar
-                yAxisId="pesos"
+              <Area
                 dataKey="sales"
-                fill="var(--color-sales)"
-                radius={[3, 3, 0, 0]}
+                type="monotone"
+                stroke="var(--color-sales)"
+                strokeWidth={2}
+                fill="url(#area-ventas)"
                 isAnimationActive={false}
               />
-              {/* El 100 % marca la meta: arriba se cumplió, abajo faltó. */}
-              <ReferenceLine
-                yAxisId="pct"
-                y={100}
-                stroke="var(--color-compliance)"
-                strokeDasharray="4 4"
-              />
+              {/* La meta va como línea punteada encima del área: donde el área
+                  queda por debajo, ese mes no se cumplió. */}
               <Line
-                yAxisId="pct"
-                dataKey="compliance"
+                dataKey="target"
                 type="monotone"
-                stroke="var(--color-compliance)"
+                stroke="var(--color-target)"
                 strokeWidth={2}
-                dot={{ r: 2.5 }}
+                strokeDasharray="5 4"
+                dot={false}
                 isAnimationActive={false}
                 connectNulls
               />
               <ChartLegend content={<ChartLegendContent />} />
-            </ComposedChart>
+            </AreaChart>
           </ChartContainer>
         ) : (
           <Skeleton className="h-[17rem] w-full" />

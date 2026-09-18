@@ -1,0 +1,36 @@
+import { Link } from "react-router-dom"
+
+import {
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar"
+import { profile } from "@/data/resume"
+
+/** Cabecera común de las barras laterales: marca y regreso a la hoja de vida. */
+export function SidebarMarca({ seccion }: { seccion: string }) {
+  return (
+    <SidebarHeader>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            size="lg"
+            tooltip="Volver a la hoja de vida"
+            render={<Link to="/" />}
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
+              {profile.initials}
+            </span>
+            <span className="flex min-w-0 flex-col text-left leading-tight">
+              <span className="truncate text-sm font-semibold">unu</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {seccion}
+              </span>
+            </span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarHeader>
+  )
+}
