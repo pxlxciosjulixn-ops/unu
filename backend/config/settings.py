@@ -240,10 +240,26 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 
 # Se leen aqui para que toda la app consuma la config desde un solo lugar.
+#
+# El chat habla con una API compatible con la de OpenAI, asi que cambiar de
+# proveedor es cambiar `CHAT_PROVIDER`: "openai" o "nvidia".
+CHAT_PROVIDER = os.getenv("CHAT_PROVIDER", "openai").strip().lower()
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_API_BASE = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+# `OPENAI_DEFAULT_MODEL` es el nombre que ya venia en el .env.
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or os.getenv(
+    "OPENAI_DEFAULT_MODEL", "gpt-4o-mini"
+)
+
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "moonshotai/kimi-k3")
-NVIDIA_MAX_TOKENS = int(os.getenv("NVIDIA_MAX_TOKENS", "4096"))
-NVIDIA_TEMPERATURE = float(os.getenv("NVIDIA_TEMPERATURE", "0.7"))
 # Solo lo usan los modelos que razonan (Kimi acepta low, high o max).
 NVIDIA_REASONING_EFFORT = os.getenv("NVIDIA_REASONING_EFFORT", "low")
+
+# Comunes a los dos proveedores.
+CHAT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", os.getenv("NVIDIA_MAX_TOKENS", "4096")))
+CHAT_TEMPERATURE = float(
+    os.getenv("CHAT_TEMPERATURE", os.getenv("NVIDIA_TEMPERATURE", "0.7"))
+)

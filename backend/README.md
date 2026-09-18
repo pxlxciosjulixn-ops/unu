@@ -121,13 +121,17 @@ La respuesta es un flujo `text/event-stream` con cuatro tipos de evento:
 
 - La `NVIDIA_API_KEY` **nunca sale del servidor**: el navegador solo habla con
   este endpoint.
-- Va en streaming porque el modelo se demora en soltar la primera palabra.
-  Medido en el endpoint gratis de NVIDIA: entre 15 y 30 segundos en un dia
-  normal, y mas de 100 cuando la cola esta cargada. Es del proveedor, no del
-  servidor: un "hola" tarda lo mismo que una pregunta larga.
-- **Cambiar de modelo es solo cambiar `NVIDIA_MODEL`** en el entorno. Cada
-  familia nombra distinto lo del razonamiento y eso lo resuelve
-  `chat.services.parametros_del_modelo()`:
+- Va en streaming porque la espera depende del proveedor. Medido con el mismo
+  codigo: **OpenAI (`gpt-4o-mini`) responde completo en unos 5 segundos**,
+  mientras el endpoint gratis de NVIDIA tardo entre 15 y 30 segundos en un dia
+  normal y mas de 100 con la cola cargada (un "hola" tarda lo mismo que una
+  pregunta larga). OpenAI cobra por token; NVIDIA es gratis pero se encola.
+- **Cambiar de proveedor es cambiar `CHAT_PROVIDER`** (`openai` o `nvidia`) y
+  el modelo, su variable correspondiente. Los dos hablan el dialecto de OpenAI,
+  asi que el codigo del streaming es el mismo; lo resuelve
+  `chat.services.proveedor_activo()`.
+- Cada familia de modelos nombra distinto lo del razonamiento, y de eso se
+  encarga `Proveedor.extras()`:
   - Kimi: `reasoning_effort` (`low`, `high`, `max`). Se manda `low`.
   - DeepSeek: `chat_template_kwargs.thinking`, que se apaga.
 
@@ -182,8 +186,12 @@ interfaz; `--reset` borra los anteriores antes de crear los nuevos. Opciones:
 | `DJANGO_ALLOWED_HOSTS` | no               | Separados por comas                                        |
 | `CORS_ALLOWED_ORIGINS` | no               | Orígenes del frontend, separados por comas                 |
 | `DATABASE_URL`         | no               | Si está vacía se usa SQLite local                          |
-| `NVIDIA_API_KEY`       | no               | Para la integración con NVIDIA NIM / DeepSeek              |
+| `NVIDIA_API_KEY`       | si con nvidia    | Llave de NVIDIA NIM                                        |
 | `NVIDIA_BASE_URL`      | no               | Por defecto `https://integrate.api.nvidia.com/v1`          |
+| `CHAT_PROVIDER`        | no               | `openai` (por defecto) o `nvidia`                          |
+| `OPENAI_API_KEY`       | si con openai    | Llave de OpenAI                                            |
+| `OPENAI_API_BASE`      | no               | Por defecto `https://api.openai.com/v1`                    |
+| `OPENAI_DEFAULT_MODEL` | no               | Por defecto `gpt-4o-mini`                                  |
 | `NVIDIA_MODEL`         | no               | Por defecto `moonshotai/kimi-k3`                           |
 | `NVIDIA_MAX_TOKENS`    | no               | Tope de la respuesta. Por defecto 4096                     |
 | `NVIDIA_TEMPERATURE`   | no               | Por defecto 0.7                                            |

@@ -1,10 +1,13 @@
 """
-Puente con la API de NVIDIA NIM (compatible con la de OpenAI) y persistencia
-de la conversacion.
+Puente con la API del modelo (OpenAI o NVIDIA NIM) y persistencia de la
+conversacion.
 
 La llave vive solo aqui, en el servidor: el navegador nunca la ve. La respuesta
-se devuelve en trozos porque el modelo tarda entre 15 y 30 segundos en soltar
-la primera palabra, y sin streaming la pagina se queda muerta todo ese rato.
+se devuelve en trozos: con OpenAI el primer token llega en un par de segundos,
+pero con el endpoint gratuito de NVIDIA se ha medido hasta mas de 100, y sin
+streaming la pagina se queda muerta todo ese rato.
+
+`CHAT_PROVIDER` decide quien responde. Los dos hablan el dialecto de OpenAI.
 """
 
 from __future__ import annotations
@@ -23,9 +26,11 @@ logger = logging.getLogger(__name__)
 
 SISTEMA = (
     "Eres un asistente conversacional. Responde en español, de forma clara y "
-    "directa. Puedes usar Markdown (listas, negritas, tablas y bloques de "
-    "código) cuando ayude a entender la respuesta. Si no sabes algo, dilo en "
-    "vez de inventarlo."
+    "directa. Usa Markdown (listas, negritas, tablas y bloques de código) "
+    "cuando ayude a entender la respuesta, pero no envuelvas la respuesta "
+    "completa en un bloque de código: la interfaz ya la muestra con formato. "
+    "Los bloques de código son solo para código. Si no sabes algo, dilo en vez "
+    "de inventarlo."
 )
 
 # Cuanta conversacion se le manda al modelo en cada turno.
@@ -77,30 +82,73 @@ def historial_para_modelo(conversacion: Conversation) -> list[dict[str, str]]:
     return mensajes
 
 
-def parametros_del_modelo() -> dict[str, object]:
+class Proveedor:
     """
-    Parametros que solo entiende cierta familia de modelos.
+    Datos del servicio que responde el chat.
 
-    Cambiar `NVIDIA_MODEL` en el `.env` no deberia obligar a tocar el codigo,
-    pero cada familia nombra distinto lo del razonamiento:
-
-    - DeepSeek: `chat_template_kwargs.thinking`, que aqui se apaga porque
-      agrega diez segundos o mas de espera sin mejorar la respuesta.
-    - Kimi: `reasoning_effort`, con valores `low`, `high` o `max`. Se deja en
-      `low` por lo mismo.
-
-    Un modelo que no reconozca el parametro simplemente lo ignora, asi que el
-    peor caso de equivocarse aqui es quedarse con el comportamiento por defecto.
+    Los dos proveedores hablan el mismo dialecto (el de OpenAI), asi que solo
+    cambian la URL, la llave, el modelo y algun parametro suelto.
     """
-    modelo = settings.NVIDIA_MODEL.lower()
 
-    if "deepseek" in modelo:
-        return {"chat_template_kwargs": {"thinking": False}}
+    def __init__(self, nombre: str, base_url: str, api_key: str, modelo: str):
+        self.nombre = nombre
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.modelo = modelo
 
-    if "kimi" in modelo and settings.NVIDIA_REASONING_EFFORT:
-        return {"reasoning_effort": settings.NVIDIA_REASONING_EFFORT}
+    @property
+    def configurado(self) -> bool:
+        return bool(self.api_key)
 
-    return {}
+    def extras(self) -> dict[str, object]:
+        """
+        Parametros que solo entiende cierta familia de modelos.
+
+        Cada familia nombra distinto lo del razonamiento:
+
+        - DeepSeek: `chat_template_kwargs.thinking`, que se apaga porque agrega
+          diez segundos o mas de espera sin mejorar la respuesta.
+        - Kimi: `reasoning_effort`, con valores `low`, `high` o `max`.
+        - Los modelos o1/o3/o4 y gpt-5 de OpenAI no aceptan `max_tokens`:
+          quieren `max_completion_tokens`, y eso se resuelve en `cuerpo()`.
+
+        Un modelo que no reconozca el parametro lo ignora, asi que el peor caso
+        es quedarse con su comportamiento por defecto.
+        """
+        modelo = self.modelo.lower()
+
+        if "deepseek" in modelo:
+            return {"chat_template_kwargs": {"thinking": False}}
+
+        if "kimi" in modelo and settings.NVIDIA_REASONING_EFFORT:
+            return {"reasoning_effort": settings.NVIDIA_REASONING_EFFORT}
+
+        return {}
+
+    def limite_de_salida(self) -> dict[str, int]:
+        """El nombre del tope de tokens cambio en los modelos que razonan."""
+        modelo = self.modelo.lower()
+        nuevo = modelo.startswith(("o1", "o3", "o4", "gpt-5"))
+        clave = "max_completion_tokens" if nuevo else "max_tokens"
+        return {clave: settings.CHAT_MAX_TOKENS}
+
+
+def proveedor_activo() -> Proveedor:
+    """El proveedor que indique `CHAT_PROVIDER`; por defecto OpenAI."""
+    if settings.CHAT_PROVIDER == "nvidia":
+        return Proveedor(
+            "nvidia",
+            settings.NVIDIA_BASE_URL,
+            settings.NVIDIA_API_KEY,
+            settings.NVIDIA_MODEL,
+        )
+
+    return Proveedor(
+        "openai",
+        settings.OPENAI_API_BASE,
+        settings.OPENAI_API_KEY,
+        settings.OPENAI_MODEL,
+    )
 
 
 def _evento(tipo: str, **datos: object) -> bytes:
@@ -121,31 +169,35 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
     La respuesta se guarda en la base al terminar, y tambien si el visitante
     cierra la pagina a mitad: lo que alcanzo a llegar no se pierde.
     """
+    proveedor = proveedor_activo()
+
     yield _evento(
         "start",
         conversation_id=str(conversacion.id),
         title=conversacion.title,
-        model=settings.NVIDIA_MODEL,
+        model=proveedor.modelo,
+        provider=proveedor.nombre,
     )
 
-    if not settings.NVIDIA_API_KEY:
+    if not proveedor.configurado:
+        variable = "OPENAI_API_KEY" if proveedor.nombre == "openai" else "NVIDIA_API_KEY"
         yield _evento(
             "error",
-            message="El servidor no tiene configurada NVIDIA_API_KEY en su .env.",
+            message=f"El servidor no tiene configurada {variable} en su .env.",
         )
         return
 
     cuerpo = {
-        "model": settings.NVIDIA_MODEL,
+        "model": proveedor.modelo,
         "messages": [
             {"role": "system", "content": SISTEMA},
             *historial_para_modelo(conversacion),
         ],
-        "temperature": settings.NVIDIA_TEMPERATURE,
+        "temperature": settings.CHAT_TEMPERATURE,
         "top_p": 0.95,
-        "max_tokens": settings.NVIDIA_MAX_TOKENS,
         "stream": True,
-        **parametros_del_modelo(),
+        **proveedor.limite_de_salida(),
+        **proveedor.extras(),
     }
 
     partes: list[str] = []
@@ -154,9 +206,9 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
         with httpx.Client(timeout=httpx.Timeout(300.0, connect=20.0)) as cliente:
             with cliente.stream(
                 "POST",
-                f"{settings.NVIDIA_BASE_URL.rstrip('/')}/chat/completions",
+                f"{proveedor.base_url}/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {settings.NVIDIA_API_KEY}",
+                    "Authorization": f"Bearer {proveedor.api_key}",
                     "Accept": "text/event-stream",
                 },
                 json=cuerpo,
@@ -166,7 +218,10 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
                     # El detalle del proveedor va al log, no al navegador: puede
                     # traer datos de la cuenta.
                     logger.warning(
-                        "NVIDIA respondió %s: %s", respuesta.status_code, detalle[:500]
+                        "%s respondió %s: %s",
+                        proveedor.nombre,
+                        respuesta.status_code,
+                        detalle[:500],
                     )
                     yield _evento(
                         "error",
@@ -215,7 +270,7 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
             "error", message="El modelo tardó demasiado en responder. Intenta de nuevo."
         )
     except httpx.HTTPError as exc:
-        logger.warning("Fallo de red con NVIDIA: %s", exc)
+        logger.warning("Fallo de red con %s: %s", proveedor.nombre, exc)
         yield _evento("error", message="No se pudo conectar con el modelo.")
     finally:
         # `finally` tambien corre si el visitante cierra la pestaña a mitad de

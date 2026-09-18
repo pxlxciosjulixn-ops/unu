@@ -35,7 +35,14 @@ services:
       # es mas rapida que la externa.
       - key: DATABASE_URL
         sync: false
-      # Se pega en el panel. Nunca en el repo.
+      # Proveedor del chat: openai (rapido, de pago) o nvidia (gratis, con colas).
+      - key: CHAT_PROVIDER
+        value: openai
+      # Las llaves se pegan en el panel. Nunca en el repo.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_DEFAULT_MODEL
+        value: gpt-4o-mini
       - key: NVIDIA_API_KEY
         sync: false
       - key: NVIDIA_MODEL

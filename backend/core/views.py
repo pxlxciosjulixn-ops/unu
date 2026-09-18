@@ -43,10 +43,15 @@ def health(request: Request) -> Response:
         },
         # Solo se informa si la key esta configurada, nunca su valor.
         "integrations": {
+            "chat_provider": settings.CHAT_PROVIDER,
+            "openai": {
+                "configured": bool(settings.OPENAI_API_KEY),
+                "model": settings.OPENAI_MODEL,
+            },
             "nvidia": {
                 "configured": bool(settings.NVIDIA_API_KEY),
                 "model": settings.NVIDIA_MODEL,
-            }
+            },
         },
     }
 
