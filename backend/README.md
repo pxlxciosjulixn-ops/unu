@@ -47,6 +47,10 @@ En Linux/macOS los comandos son `env/bin/python` en vez de `env/Scripts/python.e
 | Método | Ruta                             | Descripción                                    |
 | ------ | -------------------------------- | ---------------------------------------------- |
 | GET    | `/api/health/`                   | Estado del servicio y de la base de datos      |
+| POST   | `/api/auth/login/`               | Usuario y contraseña → tokens JWT              |
+| POST   | `/api/auth/refresh/`             | Refresco → acceso nuevo                        |
+| POST   | `/api/auth/logout/`              | Invalida el refresco                           |
+| GET    | `/api/auth/me/`                  | Datos del dueño del token (exige sesión)       |
 | POST   | `/api/chat/`                     | Conversación con el modelo, en streaming (SSE) |
 | GET    | `/api/chat/conversations/`       | Historial del visitante                        |
 | GET    | `/api/chat/conversations/<id>/`  | Mensajes de una conversación                   |
@@ -102,6 +106,37 @@ guarda en la petición para no repetirlo en cada sub-vista.
 ```
 
 De las integraciones solo informa si la key **está configurada**, nunca su valor.
+
+## Autenticacion (JWT)
+
+El login devuelve dos tokens: **acceso** (60 min por defecto) que acompaña a
+cada peticion en `Authorization: Bearer ...`, y **refresco** (7 dias) que sirve
+para pedir un acceso nuevo sin volver a escribir la contraseña.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login/   -H "Content-Type: application/json"   -d '{"username": "tu-usuario", "password": "tu-clave"}'
+```
+
+Responde `{"access": "...", "refresh": "...", "user": {...}}`.
+
+- **La rotacion esta activada**: cada refresco entrega uno nuevo y deja el
+  anterior en la lista negra (`token_blacklist`), asi que un refresco robado
+  deja de servir en cuanto el dueño lo usa.
+- **`/api/auth/logout/`** mete el refresco en la lista negra. El acceso sigue
+  vivo hasta que expire, por eso se emite corto.
+- Los tokens se firman con `DJANGO_SECRET_KEY`: si cambia, todas las sesiones
+  caducan.
+- Duraciones ajustables con `JWT_ACCESS_MINUTES` y `JWT_REFRESH_DAYS`.
+- Limite de 10 intentos por minuto y por IP contra el login.
+
+### Crear un usuario
+
+```bash
+env/Scripts/python.exe manage.py createsuperuser
+```
+
+En el frontend, `/login` pide las credenciales y `/home` es la pagina protegida
+("HOME DEL LOGIN"): si el token no sirve, devuelve al login.
 
 ## Chat con el modelo
 
@@ -187,6 +222,8 @@ interfaz; `--reset` borra los anteriores antes de crear los nuevos. Opciones:
 | `CORS_ALLOWED_ORIGINS` | no               | Orígenes del frontend, separados por comas                 |
 | `DATABASE_URL`         | no               | Si está vacía se usa SQLite local                          |
 | `NVIDIA_API_KEY`       | si con nvidia    | Llave de NVIDIA NIM                                        |
+| `JWT_ACCESS_MINUTES`   | no               | Vida del token de acceso. Por defecto 60                   |
+| `JWT_REFRESH_DAYS`     | no               | Vida del token de refresco. Por defecto 7                  |
 | `NVIDIA_BASE_URL`      | no               | Por defecto `https://integrate.api.nvidia.com/v1`          |
 | `CHAT_PROVIDER`        | no               | `openai` (por defecto) o `nvidia`                          |
 | `OPENAI_API_KEY`       | si con openai    | Llave de OpenAI                                            |

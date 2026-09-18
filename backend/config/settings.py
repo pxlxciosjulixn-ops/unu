@@ -5,6 +5,7 @@ Todos los valores sensibles o dependientes del entorno se leen de un archivo
 `.env` (ver `.env.example`). Nada de secretos hardcodeados aqui.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
@@ -90,6 +91,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Terceros
     "rest_framework",
+    # Guarda los refresh ya usados o cerrados, para que no se puedan reusar.
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     # Propias
     "core",
@@ -163,6 +166,8 @@ else:
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        # JWT para el frontend; sesion para el admin y la API navegable.
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -173,8 +178,26 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
-    # El chat gasta cuota de NVIDIA con cada llamada: se limita por IP.
-    "DEFAULT_THROTTLE_RATES": {"chat": "20/min"},
+    # El chat gasta cuota del proveedor con cada llamada: se limita por IP.
+    # El login se limita para frenar los intentos a ciegas.
+    "DEFAULT_THROTTLE_RATES": {"chat": "20/min", "login": "10/min"},
+}
+
+# ---------------------------------------------------------------------------
+# JWT
+# ---------------------------------------------------------------------------
+
+SIMPLE_JWT = {
+    # Acceso corto: si roban el token, sirve poco tiempo.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("JWT_ACCESS_MINUTES", "60"))),
+    # Refresco largo: evita pedir la contraseña todos los dias.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("JWT_REFRESH_DAYS", "7"))),
+    "ROTATE_REFRESH_TOKENS": True,
+    # Al rotar, el refresco anterior queda invalidado; asi el logout sirve.
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    # Los tokens se firman con la SECRET_KEY: si cambia, todos caducan.
+    "SIGNING_KEY": SECRET_KEY,
 }
 
 if DEBUG:

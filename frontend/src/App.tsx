@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
+import { SesionProvider } from "@/components/auth/auth-context"
+import { RutaProtegida } from "@/components/auth/ruta-protegida"
 import { ChatProvider } from "@/components/chat/chat-context"
 import { ChatWidget } from "@/components/chat/chat-widget"
 import { ResumePage } from "@/components/resume/resume-page"
@@ -18,6 +20,22 @@ const DashboardPage = lazy(() =>
 const ChatbotPage = lazy(() =>
   import("@/components/chatbot/chatbot-page").then((m) => ({
     default: m.ChatbotPage,
+  }))
+)
+
+const ProyectosPage = lazy(() =>
+  import("@/components/proyectos/proyectos-page").then((m) => ({
+    default: m.ProyectosPage,
+  }))
+)
+
+const LoginPage = lazy(() =>
+  import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
+)
+
+const HomeDelLoginPage = lazy(() =>
+  import("@/components/auth/home-page").then((m) => ({
+    default: m.HomeDelLoginPage,
   }))
 )
 
@@ -47,26 +65,56 @@ function ResumeScreen() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<ResumeScreen />} />
-      <Route
-        path="/dashboard"
-        element={
-          <Suspense fallback={<CargandoPagina />}>
-            <DashboardPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/chatbot"
-        element={
-          <Suspense fallback={<CargandoPagina />}>
-            <ChatbotPage />
-          </Suspense>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    // La sesión envuelve todo: el login y la home protegida la comparten, y
+    // así el estado sobrevive al navegar entre rutas.
+    <SesionProvider>
+      <Routes>
+        <Route path="/" element={<ResumeScreen />} />
+        <Route
+          path="/proyectos"
+          element={
+            <Suspense fallback={<CargandoPagina />}>
+              <ProyectosPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <Suspense fallback={<CargandoPagina />}>
+              <LoginPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/home"
+          element={
+            <RutaProtegida>
+              <Suspense fallback={<CargandoPagina />}>
+                <HomeDelLoginPage />
+              </Suspense>
+            </RutaProtegida>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <Suspense fallback={<CargandoPagina />}>
+              <DashboardPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/chatbot"
+          element={
+            <Suspense fallback={<CargandoPagina />}>
+              <ChatbotPage />
+            </Suspense>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </SesionProvider>
   )
 }
 

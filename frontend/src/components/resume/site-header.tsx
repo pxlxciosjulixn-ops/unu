@@ -1,4 +1,9 @@
-import { BotIcon, LayoutDashboardIcon, PrinterIcon } from "lucide-react"
+import {
+  BotIcon,
+  FolderIcon,
+  LogInIcon,
+  PrinterIcon,
+} from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { useChat } from "@/components/chat/chat-context"
@@ -34,10 +39,21 @@ export function SiteHeader() {
             variant="outline"
             size="sm"
             nativeButton={false}
-            render={<Link to="/dashboard" />}
+            render={<Link to="/home" />}
           >
-            <LayoutDashboardIcon data-icon="inline-start" />
-            <span className="hidden sm:inline">Dashboard</span>
+            <LogInIcon data-icon="inline-start" />
+            <span className="hidden sm:inline">Ingresar</span>
+          </Button>
+          {/* Proyectos reemplaza el enlace directo al dashboard: desde ahí se
+              entra al panel y al chatbot, y la barra no se llena de botones. */}
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link to="/proyectos" />}
+          >
+            <FolderIcon data-icon="inline-start" />
+            <span className="hidden sm:inline">Proyectos</span>
           </Button>
           <Button variant="outline" size="sm" onClick={abrir}>
             <BotIcon data-icon="inline-start" />

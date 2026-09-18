@@ -1,0 +1,119 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 640 900"
+  width="640"
+  height="900"
+  role="img"
+  aria-label="Ilustración de una red de nodos y una serie de datos"
+>
+  <title>Datos, modelos y código</title>
+
+  <defs>
+    <!-- Cuadrícula técnica de fondo. -->
+    <pattern id="rejilla" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+    </pattern>
+    <!-- El área bajo la serie se desvanece hacia abajo. -->
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <!-- Viñeta: oscurece los bordes para que el texto encima se lea. -->
+    <radialGradient id="vineta" cx="0.5" cy="0.42" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0" />
+      <stop offset="1" stop-color="#000000" stop-opacity="0.55" />
+    </radialGradient>
+  </defs>
+
+  <rect width="640" height="900" fill="#1f1f1f" />
+  <rect width="640" height="900" fill="url(#rejilla)" />
+
+  <!-- ─── Red de nodos: la parte de modelos ─────────────────────────── -->
+  <g stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.25" fill="none">
+    <!-- entrada -> capa 1 -->
+    <path d="M110 210 L250 150" />
+    <path d="M110 210 L250 250" />
+    <path d="M110 210 L250 350" />
+    <path d="M110 330 L250 150" />
+    <path d="M110 330 L250 250" />
+    <path d="M110 330 L250 350" />
+    <path d="M110 450 L250 250" />
+    <path d="M110 450 L250 350" />
+    <!-- capa 1 -> capa 2 -->
+    <path d="M250 150 L400 200" />
+    <path d="M250 150 L400 320" />
+    <path d="M250 250 L400 200" />
+    <path d="M250 250 L400 320" />
+    <path d="M250 350 L400 200" />
+    <path d="M250 350 L400 320" />
+    <!-- capa 2 -> salida -->
+    <path d="M400 200 L530 260" />
+    <path d="M400 320 L530 260" />
+  </g>
+
+  <g fill="#1f1f1f" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.5">
+    <circle cx="110" cy="210" r="7" />
+    <circle cx="110" cy="330" r="7" />
+    <circle cx="110" cy="450" r="7" />
+    <circle cx="250" cy="150" r="7" />
+    <circle cx="250" cy="250" r="7" />
+    <circle cx="250" cy="350" r="7" />
+    <circle cx="400" cy="200" r="7" />
+    <circle cx="400" cy="320" r="7" />
+  </g>
+  <!-- El nodo de salida va sólido: es el resultado. -->
+  <circle cx="530" cy="260" r="9" fill="#ffffff" fill-opacity="0.92" />
+
+  <!-- ─── Serie de tiempo: la parte de datos ────────────────────────── -->
+  <g>
+    <!-- Ejes tenues. -->
+    <path d="M90 700 H560" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1" />
+    <path d="M90 620 H560" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="4 6" />
+    <path d="M90 540 H560" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="4 6" />
+
+    <path
+      d="M90 660 L152 636 L214 668 L276 596 L338 616 L400 556 L462 588 L524 524 L560 546 L560 700 L90 700 Z"
+      fill="url(#area)"
+    />
+    <path
+      d="M90 660 L152 636 L214 668 L276 596 L338 616 L400 556 L462 588 L524 524 L560 546"
+      fill="none"
+      stroke="#ffffff"
+      stroke-opacity="0.85"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
+    <!-- Meta: la línea punteada, como en el panel. -->
+    <path
+      d="M90 640 L560 572"
+      fill="none"
+      stroke="#ffffff"
+      stroke-opacity="0.4"
+      stroke-width="1.5"
+      stroke-dasharray="7 6"
+    />
+    <g fill="#ffffff" fill-opacity="0.9">
+      <circle cx="276" cy="596" r="4" />
+      <circle cx="400" cy="556" r="4" />
+      <circle cx="524" cy="524" r="4" />
+    </g>
+  </g>
+
+  <!-- ─── Código: la parte de software ──────────────────────────────── -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#ffffff">
+    <text x="90" y="742" fill-opacity="0.5">SELECT modelo, ventas</text>
+    <text x="90" y="768" fill-opacity="0.35">FROM panel WHERE meta &lt; real</text>
+    <text x="90" y="794" fill-opacity="0.22">GROUP BY mes;</text>
+  </g>
+
+  <!-- Barras de datos sueltas, arriba a la derecha. -->
+  <g fill="#ffffff">
+    <rect x="470" y="140" width="8" height="34" rx="4" fill-opacity="0.25" />
+    <rect x="488" y="124" width="8" height="50" rx="4" fill-opacity="0.4" />
+    <rect x="506" y="106" width="8" height="68" rx="4" fill-opacity="0.6" />
+    <rect x="524" y="130" width="8" height="44" rx="4" fill-opacity="0.35" />
+  </g>
+
+  <rect width="640" height="900" fill="url(#vineta)" />
+</svg>
