@@ -202,6 +202,33 @@ La respuesta es un flujo `text/event-stream` con cuatro tipos de evento:
   que un endpoint publico no consuma la cuota de NVIDIA.
 - Se envian como maximo los ultimos 20 mensajes y 24.000 caracteres.
 
+### Cuanto gasta cada chat
+
+Todo esto vive en `chat/services.py`, que es donde se ajusta:
+
+| | Asistente general (`/chatbot`) | Hoja de vida (widget) |
+| --- | --- | --- |
+| Pregunta | 6.000 caracteres | 300 caracteres |
+| Respuesta | 600 tokens | 220 tokens |
+| Historial que se arrastra | 20 mensajes | 6 mensajes |
+| Cupo por visitante | 5 mensajes | sin tope |
+
+Los dos prompts piden respuestas concretas y sin relleno (nada de presentarse,
+repetir la pregunta ni ofrecer mas ayuda al final). El del CV manda ademas la
+hoja de vida entera en cada turno, unos 9.000 caracteres: por eso es el que
+lleva los numeros mas cortos.
+
+**El cupo** (`CUPO_POR_VISITANTE`) es un tope total por visitante, no por
+minuto: cuando se acaba, `POST /api/chat/` responde `429` con el mensaje ya
+listo para mostrar. Se lleva en la tabla `ChatQuota` y no contando los mensajes
+guardados, porque el visitante puede borrar sus conversaciones y entonces
+borrarlas seria la forma de estrenar el cupo otra vez.
+
+`GET /api/chat/conversations/` devuelve tambien `quota` (`used`, `limit`,
+`remaining`), que es lo que la pagina usa para mostrar cuantos mensajes quedan
+y desactivar la caja al llegar a cero. `limit` y `remaining` van en `null`
+cuando ese chat no tiene tope.
+
 ### Historial y privacidad
 
 Las conversaciones y sus mensajes quedan guardados (app `chat`). Como no hay

@@ -25,6 +25,18 @@ export type Conversacion = {
   message_count: number
 }
 
+/**
+ * Cuántos mensajes le quedan al visitante en este chat.
+ *
+ * `limit` y `remaining` vienen en `null` cuando ese chat no tiene tope; el
+ * servidor es quien decide, la página solo lo muestra.
+ */
+export type Cupo = {
+  used: number
+  limit: number | null
+  remaining: number | null
+}
+
 export type ConversacionConMensajes = Conversacion & {
   messages: MensajeGuardado[]
 }

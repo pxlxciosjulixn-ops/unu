@@ -73,16 +73,18 @@ def conversations(request: Request) -> Response:
     alguien le hace al chat flotante de la hoja de vida.
     """
     visitante = _visitante(request)
+    alcance = _alcance(request.query_params.get("scope"))
     consulta = (
-        Conversation.objects.filter(
-            visitor=visitante, scope=_alcance(request.query_params.get("scope"))
-        )
+        Conversation.objects.filter(visitor=visitante, scope=alcance)
         .annotate(total=Count("messages"))
         .order_by("-updated_at")[:MAX_CONVERSACIONES]
     )
     return Response(
         {
             "results": [_conversacion_como_dict(c, c.total) for c in consulta],
+            # Cuanto le queda al visitante: la pagina lo muestra y desactiva la
+            # caja cuando llega a cero, en vez de dejarlo escribir para nada.
+            "quota": services.cupo_de(visitante, alcance),
         }
     )
 
@@ -151,6 +153,19 @@ def send(request: Request) -> StreamingHttpResponse | Response:
             scope=_alcance(request.data.get("scope")),
         )
 
+    cupo = services.cupo_de(visitante, conversacion.scope)
+    if cupo["remaining"] == 0:
+        return Response(
+            {
+                "detail": (
+                    f"Llegaste al límite de {cupo['limit']} mensajes de esta "
+                    "demostración. Escríbeme por correo si quieres ver más."
+                ),
+                "quota": cupo,
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
     # El chat de la hoja de vida acepta preguntas cortas. El navegador ya frena
     # el texto de mas, pero el tope se comprueba aqui: es lo que evita que una
     # peticion hecha a mano mande un mensaje enorme y se pague en tokens.
@@ -175,6 +190,7 @@ def send(request: Request) -> StreamingHttpResponse | Response:
     Message.objects.create(
         conversation=conversacion, role=Message.Role.USER, content=texto
     )
+    services.gastar_del_cupo(visitante, conversacion.scope)
 
     respuesta = StreamingHttpResponse(
         services.transmitir(conversacion),

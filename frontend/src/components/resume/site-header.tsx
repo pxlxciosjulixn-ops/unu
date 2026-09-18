@@ -39,7 +39,8 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav aria-label="Secciones" className="flex items-center gap-2">
+        {/* `ml-auto` empuja los tres botones al borde derecho, juntos. */}
+        <nav aria-label="Secciones" className="ml-auto flex items-center gap-2">
           {SECCIONES.map((seccion) => {
             const activa = pathname === seccion.ruta
 
@@ -68,11 +69,9 @@ export function SiteHeader() {
           })}
         </nav>
 
-        {/* `ml-auto` lo empuja al borde derecho, separado de la navegación. */}
         <Button
           variant="outline"
           size="sm"
-          className="ml-auto"
           nativeButton={false}
           render={<Link to="/home" />}
         >

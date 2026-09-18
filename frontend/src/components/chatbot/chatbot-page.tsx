@@ -87,15 +87,20 @@ export function ChatbotPage() {
   const [modelo, setModelo] = React.useState<string | null>(null)
   const [segundos, setSegundos] = React.useState(0)
   const [razonando, setRazonando] = React.useState(false)
+  // Cuántos mensajes le quedan al visitante. `null` mientras no ha respondido
+  // el servidor, o si este chat no tiene tope.
+  const [restantes, setRestantes] = React.useState<number | null>(null)
 
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const abortoRef = React.useRef<AbortController | null>(null)
   const ocupado = estado !== "libre"
+  const sinCupo = restantes === 0
 
   const refrescarLista = React.useCallback(async (signal?: AbortSignal) => {
     try {
-      const { results } = await listarConversaciones(signal)
+      const { results, quota } = await listarConversaciones(signal)
       setConversaciones(results)
+      setRestantes(quota.remaining)
     } catch {
       // El historial es secundario: si falla, el chat sigue sirviendo.
     } finally {
@@ -106,7 +111,10 @@ export function ChatbotPage() {
   React.useEffect(() => {
     const controlador = new AbortController()
     listarConversaciones(controlador.signal)
-      .then(({ results }) => setConversaciones(results))
+      .then(({ results, quota }) => {
+        setConversaciones(results)
+        setRestantes(quota.remaining)
+      })
       // El historial es secundario: si falla, el chat sigue sirviendo.
       .catch(() => undefined)
       .finally(() => setCargandoLista(false))
@@ -178,7 +186,7 @@ export function ChatbotPage() {
 
   async function enviar(texto: string) {
     const limpio = texto.trim()
-    if (!limpio || ocupado) return
+    if (!limpio || ocupado || sinCupo) return
 
     const idUsuario = nuevoId("u")
     const idRespuesta = nuevoId("a")
@@ -267,6 +275,13 @@ export function ChatbotPage() {
       }
       acciones={
         <>
+          {restantes !== null ? (
+            <Badge variant={restantes === 0 ? "destructive" : "outline"}>
+              {restantes === 0
+                ? "Sin mensajes"
+                : `${restantes} ${restantes === 1 ? "mensaje" : "mensajes"}`}
+            </Badge>
+          ) : null}
           {modelo ? (
             <Badge
               variant="outline"
@@ -428,10 +443,14 @@ export function ChatbotPage() {
                       void enviar(borrador)
                     }
                   }}
-                  disabled={ocupado}
+                  disabled={ocupado || sinCupo}
                   rows={1}
                   aria-label="Mensaje"
-                  placeholder="Escribe tu mensaje…"
+                  placeholder={
+                    sinCupo
+                      ? "Se acabaron los mensajes de esta demostración"
+                      : "Escribe tu mensaje…"
+                  }
                   className="min-h-10 resize-none"
                 />
                 <InputGroupAddon align="block-end">
@@ -473,7 +492,7 @@ export function ChatbotPage() {
                     <InputGroupButton
                       type="submit"
                       size="icon-xs"
-                      disabled={!borrador.trim()}
+                      disabled={!borrador.trim() || sinCupo}
                       aria-label="Enviar mensaje"
                       className="ml-auto rounded-full"
                     >

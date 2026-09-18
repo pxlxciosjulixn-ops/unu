@@ -43,6 +43,37 @@ class Conversation(models.Model):
         return self.title or str(self.id)
 
 
+class ChatQuota(models.Model):
+    """
+    Cuantos mensajes lleva gastados un visitante.
+
+    Va en su propia tabla y no se cuenta sobre los mensajes guardados a
+    proposito: el visitante puede borrar sus conversaciones, y si el cupo
+    saliera de ahi, borrarlas seria la forma de estrenarlo otra vez.
+
+    El cupo es por alcance porque los dos chats cuestan distinto: el de la hoja
+    de vida manda el CV entero en cada turno.
+    """
+
+    visitor = models.CharField("visitante", max_length=64, help_text="Hash de la IP")
+    scope = models.CharField("alcance", max_length=16, choices=Conversation.Scope.choices)
+    used = models.PositiveIntegerField("mensajes gastados", default=0)
+    updated_at = models.DateTimeField("ultimo mensaje", auto_now=True)
+
+    class Meta:
+        verbose_name = "cupo del chat"
+        verbose_name_plural = "cupos del chat"
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["visitor", "scope"], name="cupo_unico_por_visitante_y_alcance"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.visitor[:8]}… {self.scope}: {self.used}"
+
+
 class Message(models.Model):
     class Role(models.TextChoices):
         USER = "user", "Usuario"

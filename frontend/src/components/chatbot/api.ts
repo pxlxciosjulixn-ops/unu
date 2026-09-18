@@ -1,15 +1,17 @@
 import type {
   Alcance,
   Conversacion,
+  Cupo,
   ConversacionConMensajes,
   EventoChat,
 } from "@/components/chatbot/tipos"
 import { API_BASE, fetchJson } from "@/lib/api"
 
 export function listarConversaciones(signal?: AbortSignal) {
-  return fetchJson<{ results: Conversacion[] }>("/api/chat/conversations/", {
-    signal,
-  })
+  return fetchJson<{ results: Conversacion[]; quota: Cupo }>(
+    "/api/chat/conversations/",
+    { signal }
+  )
 }
 
 export function traerConversacion(id: string, signal?: AbortSignal) {

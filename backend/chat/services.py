@@ -19,8 +19,9 @@ from collections.abc import Iterator
 
 import httpx
 from django.conf import settings
+from django.db.models import F
 
-from chat.models import Conversation, Message
+from chat.models import ChatQuota, Conversation, Message
 from resume.contexto import hoja_de_vida_como_texto
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,12 @@ SISTEMA = (
     "cuando ayude a entender la respuesta, pero no envuelvas la respuesta "
     "completa en un bloque de código: la interfaz ya la muestra con formato. "
     "Los bloques de código son solo para código. Si no sabes algo, dilo en vez "
-    "de inventarlo."
+    "de inventarlo.\n"
+    "Sé concreto: ve directo a la respuesta, sin presentarte, sin repetir la "
+    "pregunta y sin ofrecer más ayuda al final. Unas 150 palabras como "
+    "máximo, salvo que te pidan código, y ahí manda el código con una o dos "
+    "líneas de explicación. Si la pregunta es amplia, responde lo esencial y "
+    "ofrece en una línea profundizar en un punto concreto."
 )
 
 # Instrucciones del chat de la hoja de vida. La hoja se pega debajo, leida de
@@ -96,6 +102,19 @@ MAX_CARACTERES_RESUME = 300
 MAX_MENSAJES_RESUME = 6
 MAX_TOKENS_RESUME = 220
 
+# Tope de salida del asistente general. Menos que los 4096 configurados: las
+# respuestas kilometricas cuestan y casi nunca se leen enteras. Alcanza para
+# una consulta SQL con su explicacion.
+MAX_TOKENS_GENERAL = 600
+
+# Cuantos mensajes puede mandar un visitante en total, por alcance. `None` es
+# sin tope. Se cuenta contra la tabla `ChatQuota`, que no se reinicia aunque
+# borre sus conversaciones.
+CUPO_POR_VISITANTE: dict[str, int | None] = {
+    Conversation.Scope.GENERAL: 5,
+    Conversation.Scope.RESUME: None,
+}
+
 
 class ChatError(Exception):
     """Error que se le puede mostrar al usuario tal cual."""
@@ -118,6 +137,40 @@ def hash_visitante(ip: str) -> str:
     """Hash con sal de la IP: identifica al visitante sin guardar su IP."""
     sal = settings.SECRET_KEY.encode()
     return hashlib.sha256(sal + ip.encode()).hexdigest()
+
+
+def cupo_de(visitante: str, alcance: str) -> dict[str, int | None]:
+    """
+    Cuanto lleva gastado y cuanto le queda a un visitante.
+
+    `limit` y `remaining` vienen en `None` cuando ese chat no tiene tope.
+    """
+    tope = CUPO_POR_VISITANTE.get(alcance)
+    gastados = (
+        ChatQuota.objects.filter(visitor=visitante, scope=alcance)
+        .values_list("used", flat=True)
+        .first()
+        or 0
+    )
+    return {
+        "used": gastados,
+        "limit": tope,
+        "remaining": None if tope is None else max(tope - gastados, 0),
+    }
+
+
+def gastar_del_cupo(visitante: str, alcance: str) -> None:
+    """Suma un mensaje al contador del visitante."""
+    if CUPO_POR_VISITANTE.get(alcance) is None:
+        return
+
+    fila, creada = ChatQuota.objects.get_or_create(
+        visitor=visitante, scope=alcance, defaults={"used": 1}
+    )
+    if not creada:
+        # `F` deja el incremento en la base: dos peticiones a la vez no se
+        # pisan el contador.
+        ChatQuota.objects.filter(pk=fila.pk).update(used=F("used") + 1)
 
 
 def titulo_desde(texto: str) -> str:
@@ -268,7 +321,7 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
         **proveedor.limite_de_salida(
             MAX_TOKENS_RESUME
             if conversacion.scope == Conversation.Scope.RESUME
-            else None
+            else MAX_TOKENS_GENERAL
         ),
         **proveedor.extras(),
     }
