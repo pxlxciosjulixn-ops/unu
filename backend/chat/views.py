@@ -19,6 +19,7 @@ from chat import services
 from chat.models import Conversation, Message
 
 MAX_CARACTERES_MENSAJE = services.MAX_CARACTERES_MENSAJE
+MAX_CARACTERES_RESUME = services.MAX_CARACTERES_RESUME
 MAX_CONVERSACIONES = 50
 
 
@@ -130,7 +131,6 @@ def send(request: Request) -> StreamingHttpResponse | Response:
         return Response(
             {"detail": "El mensaje está vacío."}, status=status.HTTP_400_BAD_REQUEST
         )
-    texto = texto[:MAX_CARACTERES_MENSAJE]
 
     visitante = _visitante(request)
     identificador = request.data.get("conversation_id")
@@ -150,6 +150,23 @@ def send(request: Request) -> StreamingHttpResponse | Response:
             title=services.titulo_desde(texto),
             scope=_alcance(request.data.get("scope")),
         )
+
+    # El chat de la hoja de vida acepta preguntas cortas. El navegador ya frena
+    # el texto de mas, pero el tope se comprueba aqui: es lo que evita que una
+    # peticion hecha a mano mande un mensaje enorme y se pague en tokens.
+    if conversacion.scope == Conversation.Scope.RESUME:
+        if len(texto) > MAX_CARACTERES_RESUME:
+            return Response(
+                {
+                    "detail": (
+                        f"La pregunta no puede pasar de {MAX_CARACTERES_RESUME} "
+                        "caracteres."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        texto = texto[:MAX_CARACTERES_MENSAJE]
 
     if not conversacion.title:
         conversacion.title = services.titulo_desde(texto)

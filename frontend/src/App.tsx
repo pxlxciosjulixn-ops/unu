@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
+import { AvisoPrimeraCarga } from "@/components/aviso-primera-carga"
 import { SesionProvider } from "@/components/auth/auth-context"
 import { RutaProtegida } from "@/components/auth/ruta-protegida"
 import { ChatProvider } from "@/components/chat/chat-context"
@@ -80,6 +81,9 @@ export function App() {
     // pública como el editor.
     <SesionProvider>
       <HojaDeVidaProvider>
+        {/* Va fuera de las rutas: la espera del servidor es la misma se entre
+            por donde se entre. */}
+        <AvisoPrimeraCarga />
         <Routes>
           <Route path="/" element={<ResumeScreen />} />
           <Route

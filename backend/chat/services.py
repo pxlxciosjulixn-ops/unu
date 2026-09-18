@@ -49,10 +49,12 @@ Reglas:
 3. Si te preguntan cualquier otra cosa (noticias, código, tareas, opiniones,
    otras personas), responde que solo puedes hablar de esta hoja de vida e
    invita a preguntar por la experiencia, la formación o las herramientas.
-4. Habla de la persona en tercera persona y en español. Respuestas breves: un
-   párrafo corto o una lista de tres o cuatro puntos. Markdown ligero (listas
-   y negritas); nada de bloques de código.
-5. No inventes fechas ni cifras: usa los períodos tal como están escritos."""
+4. Habla de la persona en tercera persona y en español.
+5. Sé breve: 60 palabras como máximo, en un párrafo corto o en tres viñetas.
+   Nada de introducciones ("claro que sí", "con gusto"), de repetir la
+   pregunta ni de ofrecer más ayuda al final. Ve directo al dato. Markdown
+   ligero (listas y negritas); nada de bloques de código.
+6. No inventes fechas ni cifras: usa los períodos tal como están escritos."""
 
 SIN_HOJA_DE_VIDA = (
     "Eres el asistente de una hoja de vida, pero todavía no hay ninguna "
@@ -84,6 +86,15 @@ def sistema_para(conversacion: Conversation) -> str:
 MAX_MENSAJES = 20
 MAX_CARACTERES_MENSAJE = 6000
 MAX_CARACTERES_TOTAL = 24000
+
+# El chat de la hoja de vida es un widget en una esquina de la pagina publica,
+# no un asistente de proposito general: preguntas cortas, respuestas cortas y
+# poca conversacion de arrastre. Cada turno manda la hoja de vida entera como
+# contexto (~9.000 caracteres), asi que lo que se recorta aqui es lo que no se
+# paga tres veces en la misma charla.
+MAX_CARACTERES_RESUME = 300
+MAX_MENSAJES_RESUME = 6
+MAX_TOKENS_RESUME = 220
 
 
 class ChatError(Exception):
@@ -117,9 +128,14 @@ def titulo_desde(texto: str) -> str:
 
 def historial_para_modelo(conversacion: Conversation) -> list[dict[str, str]]:
     """Ultimos mensajes de la conversacion, recortados a los limites."""
+    if conversacion.scope == Conversation.Scope.RESUME:
+        cuantos, tope = MAX_MENSAJES_RESUME, MAX_CARACTERES_RESUME
+    else:
+        cuantos, tope = MAX_MENSAJES, MAX_CARACTERES_MENSAJE
+
     mensajes = [
-        {"role": m.role, "content": m.content[:MAX_CARACTERES_MENSAJE]}
-        for m in conversacion.messages.all().order_by("-created_at", "-id")[:MAX_MENSAJES]
+        {"role": m.role, "content": m.content[:tope]}
+        for m in conversacion.messages.all().order_by("-created_at", "-id")[:cuantos]
     ][::-1]
 
     total = sum(len(m["content"]) for m in mensajes)
@@ -172,12 +188,18 @@ class Proveedor:
 
         return {}
 
-    def limite_de_salida(self) -> dict[str, int]:
-        """El nombre del tope de tokens cambio en los modelos que razonan."""
+    def limite_de_salida(self, tope: int | None = None) -> dict[str, int]:
+        """
+        Cuanto puede responder el modelo.
+
+        El nombre del parametro cambio en los modelos que razonan. `tope`
+        permite pedir menos de lo configurado, que es lo que hace el chat de la
+        hoja de vida para que las respuestas salgan cortas.
+        """
         modelo = self.modelo.lower()
         nuevo = modelo.startswith(("o1", "o3", "o4", "gpt-5"))
         clave = "max_completion_tokens" if nuevo else "max_tokens"
-        return {clave: settings.CHAT_MAX_TOKENS}
+        return {clave: min(tope or settings.CHAT_MAX_TOKENS, settings.CHAT_MAX_TOKENS)}
 
 
 def proveedor_activo() -> Proveedor:
@@ -243,7 +265,11 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
         "temperature": settings.CHAT_TEMPERATURE,
         "top_p": 0.95,
         "stream": True,
-        **proveedor.limite_de_salida(),
+        **proveedor.limite_de_salida(
+            MAX_TOKENS_RESUME
+            if conversacion.scope == Conversation.Scope.RESUME
+            else None
+        ),
         **proveedor.extras(),
     }
 

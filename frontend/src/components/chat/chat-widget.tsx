@@ -62,6 +62,15 @@ function bienvenida(nombre: string): Mensaje {
 let contadorIds = 0
 const nuevoId = (prefijo: string) => `${prefijo}-${(contadorIds += 1)}`
 
+/**
+ * Cuánto puede escribir la persona en una pregunta.
+ *
+ * Es el mismo número que `MAX_CARACTERES_RESUME` en `chat/services.py`, que es
+ * quien lo valida de verdad: cada pregunta viaja con la hoja de vida completa
+ * como contexto, así que una pregunta larga se paga en tokens en cada turno.
+ */
+const MAX_CARACTERES = 300
+
 /** Atajos para que la caja no arranque vacía. */
 const SUGERENCIAS = [
   "¿Qué experiencia tiene en ETL?",
@@ -152,7 +161,7 @@ export function ChatWidget() {
   React.useEffect(() => () => abortoRef.current?.abort(), [])
 
   async function enviar(texto: string) {
-    const limpio = texto.trim()
+    const limpio = texto.trim().slice(0, MAX_CARACTERES)
     if (!limpio || ocupado) return
 
     const idUsuario = nuevoId("u")
@@ -396,10 +405,23 @@ export function ChatWidget() {
                 placeholder="Escribe tu pregunta…"
                 rows={1}
                 aria-label="Mensaje"
+                maxLength={MAX_CARACTERES}
                 disabled={ocupado}
                 className="max-h-32 min-h-10"
               />
               <InputGroupAddon align="block-end">
+                <span
+                  className={cn(
+                    "text-xs tabular-nums",
+                    borrador.length >= MAX_CARACTERES
+                      ? "font-medium text-destructive"
+                      : borrador.length >= MAX_CARACTERES * 0.9
+                        ? "text-foreground"
+                        : "text-muted-foreground"
+                  )}
+                >
+                  {borrador.length}/{MAX_CARACTERES}
+                </span>
                 {ocupado ? (
                   <InputGroupButton
                     type="button"
