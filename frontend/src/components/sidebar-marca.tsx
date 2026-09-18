@@ -6,10 +6,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { profile } from "@/data/resume"
+import { usePerfil } from "@/components/resume/resume-context"
 
 /** Cabecera común de las barras laterales: marca y regreso a la hoja de vida. */
 export function SidebarMarca({ seccion }: { seccion: string }) {
+  const profile = usePerfil()
+
   return (
     <SidebarHeader>
       <SidebarMenu>

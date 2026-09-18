@@ -1,4 +1,5 @@
 import type {
+  Alcance,
   Conversacion,
   ConversacionConMensajes,
   EventoChat,
@@ -12,10 +13,9 @@ export function listarConversaciones(signal?: AbortSignal) {
 }
 
 export function traerConversacion(id: string, signal?: AbortSignal) {
-  return fetchJson<ConversacionConMensajes>(
-    `/api/chat/conversations/${id}/`,
-    { signal }
-  )
+  return fetchJson<ConversacionConMensajes>(`/api/chat/conversations/${id}/`, {
+    signal,
+  })
 }
 
 export async function borrarConversacion(id: string) {
@@ -34,13 +34,20 @@ export async function borrarConversacion(id: string) {
 export async function* enviarMensaje(
   mensaje: string,
   conversacionId: string | null,
-  signal: AbortSignal
+  signal: AbortSignal,
+  /**
+   * De qué puede hablar el asistente. `resume` es el chat de la hoja de vida,
+   * que solo responde con lo que hay en el CV. Solo cuenta al abrir una
+   * conversación nueva: después manda el alcance que quedó guardado en ella.
+   */
+  alcance: Alcance = "general"
 ): AsyncGenerator<EventoChat> {
   const respuesta = await fetch(`${API_BASE}/api/chat/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       message: mensaje,
+      scope: alcance,
       ...(conversacionId ? { conversation_id: conversacionId } : {}),
     }),
     signal,

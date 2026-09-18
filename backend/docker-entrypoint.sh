@@ -16,5 +16,13 @@ if [ "${SEED_DASHBOARD:-0}" = "1" ]; then
   python manage.py seed_dashboard --reset
 fi
 
+# Hoja de vida. Encendido por defecto porque no pisa nada: solo escribe si la
+# base esta vacia, asi el CV existe desde el primer despliegue y lo que se
+# edite despues desde el sitio se queda como esta.
+if [ "${SEED_RESUME:-1}" = "1" ]; then
+  echo "==> Verificando la hoja de vida"
+  python manage.py seed_resume
+fi
+
 echo "==> Iniciando servidor"
 exec "$@"

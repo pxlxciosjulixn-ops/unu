@@ -1,9 +1,11 @@
+import { useHojaDeVida } from "@/components/resume/resume-context"
 import { SectionTitle } from "@/components/resume/resume-section"
 import { Badge } from "@/components/ui/badge"
-import { experiences } from "@/data/resume"
 import { formatearDuracion, mesesEntre } from "@/lib/fechas"
 
 export function ResumeExperience() {
+  const { hoja } = useHojaDeVida()
+
   return (
     <section
       aria-labelledby="experiencia-titulo"
@@ -12,7 +14,7 @@ export function ResumeExperience() {
       <SectionTitle id="experiencia-titulo">Experiencia</SectionTitle>
 
       <ol className="flex flex-col gap-6">
-        {experiences.map((experiencia) => (
+        {hoja.experiences.map((experiencia) => (
           <li
             key={`${experiencia.role}-${experiencia.start}`}
             className="relative flex flex-col gap-2 pl-5"
@@ -34,7 +36,7 @@ export function ResumeExperience() {
               <span className="font-normal tabular-nums">
                 ({experiencia.period} ·{" "}
                 {formatearDuracion(
-                  mesesEntre(experiencia.start, experiencia.end)
+                  mesesEntre(experiencia.start, experiencia.end || undefined)
                 )}
                 )
               </span>

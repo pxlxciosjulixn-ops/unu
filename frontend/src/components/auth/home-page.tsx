@@ -1,6 +1,7 @@
 import * as React from "react"
 import {
   BotIcon,
+  FileTextIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   UserIcon,
@@ -107,6 +108,26 @@ export function HomeDelLoginPage() {
               token: sin sesión válida devuelve 401 y esta página manda al
               login.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Editar la hoja de vida</CardTitle>
+            <CardDescription>
+              Cambia el perfil, la experiencia, la formación, las herramientas y
+              las referencias. Se guarda en la base de datos y la página pública
+              lo muestra enseguida.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              nativeButton={false}
+              render={<Link to="/home/hoja-de-vida" />}
+            >
+              <FileTextIcon data-icon="inline-start" />
+              Abrir el editor
+            </Button>
           </CardContent>
         </Card>
 

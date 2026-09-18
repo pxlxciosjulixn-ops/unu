@@ -1,18 +1,9 @@
 import type { LucideIcon } from "lucide-react"
 import { GlobeIcon, MailIcon, MapPinIcon, PhoneIcon } from "lucide-react"
 
+import { useHojaDeVida } from "@/components/resume/resume-context"
 import { PanelTitle } from "@/components/resume/resume-section"
 import { Progress, ProgressLabel } from "@/components/ui/progress"
-import {
-  SHOW_REFERENCE_CONTACTS,
-  languages,
-  personalDetails,
-  profile,
-  references,
-} from "@/data/resume"
-
-// El CV declara el nivel con palabras; la barra solo lo representa.
-const NIVEL: Record<string, number> = { Nativo: 100, Intermedio: 55 }
 
 function Contacto({
   icon: Icon,
@@ -52,30 +43,44 @@ function Contacto({
 }
 
 export function ResumeSidebar() {
+  const { hoja } = useHojaDeVida()
+  const { profile } = hoja
+
   return (
     <aside className="flex flex-col gap-8 bg-sidebar px-6 py-8 sm:px-8 md:pt-28 lg:pt-32">
-      <section aria-labelledby="contacto-titulo" className="flex flex-col gap-4">
+      <section
+        aria-labelledby="contacto-titulo"
+        className="flex flex-col gap-4"
+      >
         <PanelTitle>
           <span id="contacto-titulo">Contacto</span>
         </PanelTitle>
         <ul className="flex flex-col gap-3 text-sm">
-          <Contacto
-            icon={PhoneIcon}
-            href={`tel:${profile.phone.replace(/\s/g, "")}`}
-          >
-            {profile.phone}
-          </Contacto>
-          <Contacto icon={MailIcon} href={`mailto:${profile.email}`}>
-            {profile.email}
-          </Contacto>
-          <Contacto
-            icon={GlobeIcon}
-            href={profile.website}
-            note={profile.websiteNote}
-          >
-            {profile.websiteLabel}
-          </Contacto>
-          <Contacto icon={MapPinIcon}>{profile.address}</Contacto>
+          {profile.phone ? (
+            <Contacto
+              icon={PhoneIcon}
+              href={`tel:${profile.phone.replace(/\s/g, "")}`}
+            >
+              {profile.phone}
+            </Contacto>
+          ) : null}
+          {profile.email ? (
+            <Contacto icon={MailIcon} href={`mailto:${profile.email}`}>
+              {profile.email}
+            </Contacto>
+          ) : null}
+          {profile.website ? (
+            <Contacto
+              icon={GlobeIcon}
+              href={profile.website}
+              note={profile.website_note}
+            >
+              {profile.website_label || profile.website}
+            </Contacto>
+          ) : null}
+          {profile.address ? (
+            <Contacto icon={MapPinIcon}>{profile.address}</Contacto>
+          ) : null}
         </ul>
       </section>
 
@@ -87,7 +92,7 @@ export function ResumeSidebar() {
           <span id="informacion-titulo">Información</span>
         </PanelTitle>
         <dl className="flex flex-col gap-2 text-sm">
-          {personalDetails.map((dato) => (
+          {hoja.personal_details.map((dato) => (
             <div key={dato.label} className="flex flex-col">
               <dt className="text-xs text-muted-foreground">{dato.label}</dt>
               <dd>{dato.value}</dd>
@@ -101,17 +106,19 @@ export function ResumeSidebar() {
           <span id="idiomas-titulo">Idiomas</span>
         </PanelTitle>
         <div className="flex flex-col gap-4">
-          {languages.map((idioma) => (
+          {hoja.languages.map((idioma) => (
+            // El porcentaje viene del nivel escrito en el CV; no es un dato
+            // que se invente aquí.
             <Progress
               key={idioma.name}
-              value={NIVEL[idioma.level] ?? 0}
-              getAriaValueText={() => idioma.level}
+              value={idioma.percent}
+              getAriaValueText={() => idioma.level_label}
             >
               <ProgressLabel className="text-sm font-semibold">
                 {idioma.name}
               </ProgressLabel>
               <span className="ml-auto text-sm text-muted-foreground">
-                {idioma.level}
+                {idioma.level_label}
               </span>
             </Progress>
           ))}
@@ -126,26 +133,30 @@ export function ResumeSidebar() {
           <span id="referencias-titulo">Referencias</span>
         </PanelTitle>
         <ul className="flex flex-col gap-3 text-sm">
-          {references.map((referencia) => (
-            <li key={referencia.email} className="flex min-w-0 flex-col">
+          {hoja.references.map((referencia) => (
+            <li key={referencia.name} className="flex min-w-0 flex-col">
               <span className="font-semibold">{referencia.name}</span>
               <span className="text-xs text-muted-foreground">
                 {referencia.relation}
               </span>
-              {SHOW_REFERENCE_CONTACTS ? (
+              {profile.show_reference_contacts ? (
                 <span className="flex min-w-0 flex-col text-xs text-muted-foreground">
-                  <a
-                    href={`tel:${referencia.phone.replace(/[\s()]/g, "")}`}
-                    className="w-fit underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    {referencia.phone}
-                  </a>
-                  <a
-                    href={`mailto:${referencia.email}`}
-                    className="truncate underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    {referencia.email}
-                  </a>
+                  {referencia.phone ? (
+                    <a
+                      href={`tel:${referencia.phone.replace(/[\s()]/g, "")}`}
+                      className="w-fit underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      {referencia.phone}
+                    </a>
+                  ) : null}
+                  {referencia.email ? (
+                    <a
+                      href={`mailto:${referencia.email}`}
+                      className="truncate underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      {referencia.email}
+                    </a>
+                  ) : null}
                 </span>
               ) : null}
             </li>

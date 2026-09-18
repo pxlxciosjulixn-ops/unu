@@ -26,10 +26,11 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import { profile } from "@/data/resume"
+import { usePerfil } from "@/components/resume/resume-context"
 
 export function LoginPage() {
   const { usuario, comprobando, entrar } = useSesion()
+  const profile = usePerfil()
   const navegar = useNavigate()
   const ubicacion = useLocation()
 
@@ -213,8 +214,8 @@ export function LoginPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} {profile.firstName}{" "}
-              {profile.lastName} · {profile.title}
+              © {new Date().getFullYear()} {profile.first_name}{" "}
+              {profile.last_name} · {profile.title}
             </p>
           </div>
         </div>

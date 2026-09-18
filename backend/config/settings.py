@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     "core",
     "chat",
     "dashboard",
+    "resume",
 ]
 
 MIDDLEWARE = [

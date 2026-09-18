@@ -9,6 +9,7 @@ backend/
   config/          # proyecto Django (settings, urls, wsgi, asgi)
   core/            # app transversal: health check y chat con el modelo
   dashboard/       # modelos, endpoints y datos de prueba del tablero
+  resume/          # la hoja de vida en base de datos y su API de edicion
   Dockerfile           # imagen para Render
   docker-entrypoint.sh # migra y arranca gunicorn
   render.yaml          # configuracion del servicio, como referencia
@@ -52,7 +53,7 @@ En Linux/macOS los comandos son `env/bin/python` en vez de `env/Scripts/python.e
 | POST   | `/api/auth/logout/`              | Invalida el refresco                           |
 | GET    | `/api/auth/me/`                  | Datos del dueño del token (exige sesión)       |
 | POST   | `/api/chat/`                     | Conversación con el modelo, en streaming (SSE) |
-| GET    | `/api/chat/conversations/`       | Historial del visitante                        |
+| GET    | `/api/chat/conversations/`       | Historial del visitante (`?scope=`)            |
 | GET    | `/api/chat/conversations/<id>/`  | Mensajes de una conversación                   |
 | DELETE | `/api/chat/conversations/<id>/`  | Borra una conversación                         |
 | DELETE | `/api/chat/conversations/clear/` | Borra todo el historial del visitante          |
@@ -64,6 +65,9 @@ En Linux/macOS los comandos son `env/bin/python` en vez de `env/Scripts/python.e
 | GET    | `/api/dashboard/countries/`      | Ventas por país del cliente (`?limit=6`)       |
 | GET    | `/api/dashboard/orders/recent/`  | Últimos pedidos (`?limit=8`)                   |
 | GET    | `/api/dashboard/products/`       | Catálogo con unidades e ingresos, paginado     |
+| GET    | `/api/resume/`                   | La hoja de vida completa, con sus límites      |
+| PUT    | `/api/resume/profile/`           | Encabezado y contacto (exige sesión)           |
+| PUT    | `/api/resume/<sección>/`         | Reemplaza una sección de lista (exige sesión)  |
 | —      | `/admin/`                        | Admin de Django                                |
 
 ### Filtros
@@ -143,12 +147,30 @@ En el frontend, `/login` pide las credenciales y `/home` es la pagina protegida
 `POST /api/chat/` recibe un mensaje y devuelve la respuesta en trozos:
 
 ```json
-{ "message": "Hola", "conversation_id": "uuid opcional" }
+{ "message": "Hola", "conversation_id": "uuid opcional", "scope": "general" }
 ```
 
 Sin `conversation_id` se crea una conversación nueva y su identificador llega
 en el evento `start`. El historial lo arma el servidor leyendo la base, no el
 navegador.
+
+### Alcance: el chat de la hoja de vida
+
+`scope` decide de qué puede hablar el asistente, y queda guardado en la
+conversación:
+
+- **`general`** (por defecto): el asistente de la página `/chatbot`.
+- **`resume`**: el chat flotante de la hoja de vida. Sus instrucciones se arman
+  en cada mensaje con el CV leído de la base (`resume.contexto`), y le prohíben
+  responder con algo que no esté ahí o hablar de otros temas. Como el contexto
+  se arma en el momento, lo que se edite en `/home/hoja-de-vida` cambia las
+  respuestas en el siguiente mensaje, sin reiniciar ni limpiar cache. Si la base
+  todavía no tiene hoja de vida, el asistente responde que no tiene el perfil en
+  vez de inventarlo.
+
+`GET /api/chat/conversations/` filtra por `?scope=` (general por defecto), para
+que el historial de la página `/chatbot` no se mezcle con las preguntas sueltas
+del chat de la hoja de vida.
 
 La respuesta es un flujo `text/event-stream` con cuatro tipos de evento:
 `start` (trae el nombre del modelo), `delta` (un trozo de texto), `done` y
@@ -198,6 +220,39 @@ que conviene tener presentes:
 
 La respuesta del modelo se guarda tambien si el visitante cierra la pestaña a
 mitad: lo que alcanzo a llegar queda registrado.
+
+## Hoja de vida
+
+El CV vive en la base (app `resume`) y se edita desde el sitio, en
+`/home/hoja-de-vida`, detrás del login. `GET /api/resume/` es público —lo
+consume la página pública— y las escrituras exigen el token JWT.
+
+La respuesta trae, además de los datos, el bloque `limits`: el tope de
+caracteres de cada campo y el máximo de elementos de cada lista. Salen de
+`resume/limites.py`, que es de donde también se sacan los `max_length` de los
+modelos y las validaciones de la API. El editor los usa para sus contadores, de
+modo que lo que deja escribir es exactamente lo que el servidor acepta y lo que
+cabe en su caja de la hoja. Si un texto se queda corto, se cambia el número ahí
+(y se genera la migración si cambió un `max_length`).
+
+Las secciones de lista se guardan completas: el editor manda el arreglo como
+quedó en pantalla y el backend reemplaza la sección dentro de una transacción.
+Si algún elemento no pasa la validación, no se guarda nada y lo anterior queda
+intacto.
+
+Secciones: `about`, `skill_groups`, `languages`, `personal_details`,
+`references`, `experiences`, `education`, `certifications`.
+
+Para cargar el CV inicial (el que antes vivía en el frontend):
+
+```bash
+env/Scripts/python.exe manage.py seed_resume
+```
+
+No pisa nada: si ya hay perfil guardado, no toca la base. Con `--reset` sí borra
+y vuelve a escribir los datos de origen. El contenedor lo corre en cada arranque
+(`SEED_RESUME=1` por defecto), así que la hoja existe desde el primer despliegue
+y lo que se edite después se queda.
 
 ## Datos de prueba del dashboard
 

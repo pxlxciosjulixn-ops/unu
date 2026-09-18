@@ -1,8 +1,10 @@
+import { useHojaDeVida } from "@/components/resume/resume-context"
 import { SectionTitle } from "@/components/resume/resume-section"
 import { Badge } from "@/components/ui/badge"
-import { skillGroups } from "@/data/resume"
 
 export function ResumeSkills() {
+  const { hoja } = useHojaDeVida()
+
   return (
     <section
       aria-labelledby="herramientas-titulo"
@@ -11,9 +13,9 @@ export function ResumeSkills() {
       <SectionTitle id="herramientas-titulo">Herramientas</SectionTitle>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        {skillGroups.map((grupo) => (
+        {hoja.skill_groups.map((grupo) => (
           <div key={grupo.name} className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground">
+            <h3 className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
               {grupo.name}
             </h3>
             <ul className="flex flex-wrap gap-1.5">

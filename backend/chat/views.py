@@ -33,10 +33,18 @@ def _visitante(request: Request) -> str:
     return services.hash_visitante(services.ip_del_visitante(peticion))
 
 
+def _alcance(valor: object) -> str:
+    """El alcance pedido, si es uno de los que existen; si no, el general."""
+    if valor in Conversation.Scope.values:
+        return str(valor)
+    return Conversation.Scope.GENERAL
+
+
 def _conversacion_como_dict(conversacion: Conversation, mensajes: int | None = None) -> dict:
     return {
         "id": str(conversacion.id),
         "title": conversacion.title,
+        "scope": conversacion.scope,
         "created_at": conversacion.created_at,
         "updated_at": conversacion.updated_at,
         "message_count": (
@@ -56,10 +64,18 @@ def _mensaje_como_dict(mensaje: Message) -> dict:
 
 @api_view(["GET"])
 def conversations(request: Request) -> Response:
-    """Conversaciones del visitante, de la mas reciente a la mas antigua."""
+    """
+    Conversaciones del visitante, de la mas reciente a la mas antigua.
+
+    Se filtran por alcance (`?scope=`, general por defecto) para que el
+    historial de la pagina /chatbot no se mezcle con las preguntas sueltas que
+    alguien le hace al chat flotante de la hoja de vida.
+    """
     visitante = _visitante(request)
     consulta = (
-        Conversation.objects.filter(visitor=visitante)
+        Conversation.objects.filter(
+            visitor=visitante, scope=_alcance(request.query_params.get("scope"))
+        )
         .annotate(total=Count("messages"))
         .order_by("-updated_at")[:MAX_CONVERSACIONES]
     )
@@ -104,9 +120,10 @@ def send(request: Request) -> StreamingHttpResponse | Response:
     """
     Manda un mensaje y devuelve la respuesta del modelo en trozos (SSE).
 
-    Recibe `{"message": "...", "conversation_id": "uuid opcional"}`. Sin
-    `conversation_id` se crea una conversacion nueva. El mensaje del usuario y
-    la respuesta quedan guardados en la base.
+    Recibe `{"message": "...", "conversation_id": "uuid opcional", "scope":
+    "general|resume"}`. Sin `conversation_id` se crea una conversacion nueva
+    con ese alcance; con el, manda el alcance que ya tenia la conversacion. El
+    mensaje del usuario y la respuesta quedan guardados en la base.
     """
     texto = (request.data.get("message") or "").strip()
     if not texto:
@@ -129,7 +146,9 @@ def send(request: Request) -> StreamingHttpResponse | Response:
             )
     else:
         conversacion = Conversation.objects.create(
-            visitor=visitante, title=services.titulo_desde(texto)
+            visitor=visitante,
+            title=services.titulo_desde(texto),
+            scope=_alcance(request.data.get("scope")),
         )
 
     if not conversacion.title:

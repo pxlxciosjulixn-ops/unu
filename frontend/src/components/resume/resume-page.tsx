@@ -5,9 +5,11 @@ import { ResumeHeader } from "@/components/resume/resume-header"
 import { ResumeSidebar } from "@/components/resume/resume-sidebar"
 import { ResumeSkills } from "@/components/resume/resume-skills"
 import { Separator } from "@/components/ui/separator"
-import { profile } from "@/data/resume"
+import { usePerfil } from "@/components/resume/resume-context"
 
 export function ResumePage() {
+  const profile = usePerfil()
+
   return (
     <div className="flex flex-col gap-6">
       {/* La hoja: banda oscura arriba, columna gris a la izquierda y el
@@ -31,7 +33,7 @@ export function ResumePage() {
       </article>
 
       <footer className="pb-20 text-center text-xs text-muted-foreground sm:pb-4">
-        {profile.firstName} {profile.lastName} · {profile.title} ·{" "}
+        {profile.first_name} {profile.last_name} · {profile.title} ·{" "}
         {new Date().getFullYear()}
       </footer>
     </div>

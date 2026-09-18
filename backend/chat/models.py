@@ -13,9 +13,21 @@ from django.db import models
 
 
 class Conversation(models.Model):
+    class Scope(models.TextChoices):
+        GENERAL = "general", "Asistente general"
+        RESUME = "resume", "Solo la hoja de vida"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     visitor = models.CharField(
         "visitante", max_length=64, db_index=True, help_text="Hash de la IP"
+    )
+    # De que puede hablar el asistente en esta conversacion. El chat flotante
+    # de la hoja de vida abre conversaciones `resume`, que solo responden con
+    # lo que hay en el CV; la pagina /chatbot sigue siendo el asistente
+    # general. Se guarda en la conversacion y no en cada mensaje porque no
+    # cambia a mitad de charla.
+    scope = models.CharField(
+        "alcance", max_length=16, choices=Scope.choices, default=Scope.GENERAL
     )
     title = models.CharField("titulo", max_length=120, blank=True)
     created_at = models.DateTimeField("creada", auto_now_add=True)

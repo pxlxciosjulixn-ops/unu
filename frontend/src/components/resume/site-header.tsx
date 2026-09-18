@@ -1,15 +1,10 @@
-import {
-  BotIcon,
-  FolderIcon,
-  LogInIcon,
-  PrinterIcon,
-} from "lucide-react"
+import { BotIcon, FolderIcon, LogInIcon, PrinterIcon } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { useChat } from "@/components/chat/chat-context"
+import { usePerfil } from "@/components/resume/resume-context"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { profile } from "@/data/resume"
 
 /**
  * Barra de la aplicación: marca y acciones. No lleva enlaces a las secciones
@@ -17,7 +12,8 @@ import { profile } from "@/data/resume"
  */
 export function SiteHeader() {
   const { abrir } = useChat()
-  const nombreCorto = `${profile.firstName.split(" ")[0]} ${profile.lastName.split(" ")[0]}`
+  const profile = usePerfil()
+  const nombreCorto = `${profile.first_name.split(" ")[0]} ${profile.last_name.split(" ")[0]}`
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-md print:hidden">

@@ -21,6 +21,7 @@ import httpx
 from django.conf import settings
 
 from chat.models import Conversation, Message
+from resume.contexto import hoja_de_vida_como_texto
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,52 @@ SISTEMA = (
     "Los bloques de código son solo para código. Si no sabes algo, dilo en vez "
     "de inventarlo."
 )
+
+# Instrucciones del chat de la hoja de vida. La hoja se pega debajo, leida de
+# la base en ese momento.
+SISTEMA_HOJA_DE_VIDA = """\
+Eres el asistente de la hoja de vida que aparece abajo y respondes las
+preguntas de quien la está leyendo (un reclutador, por ejemplo).
+
+Reglas:
+1. Responde únicamente con lo que dice la hoja de vida. No agregues
+   experiencia, estudios, herramientas ni datos de contacto que no estén ahí,
+   ni los deduzcas.
+2. Si te preguntan algo del perfil que la hoja no menciona, dilo tal cual y
+   ofrece lo más cercano que sí aparezca.
+3. Si te preguntan cualquier otra cosa (noticias, código, tareas, opiniones,
+   otras personas), responde que solo puedes hablar de esta hoja de vida e
+   invita a preguntar por la experiencia, la formación o las herramientas.
+4. Habla de la persona en tercera persona y en español. Respuestas breves: un
+   párrafo corto o una lista de tres o cuatro puntos. Markdown ligero (listas
+   y negritas); nada de bloques de código.
+5. No inventes fechas ni cifras: usa los períodos tal como están escritos."""
+
+SIN_HOJA_DE_VIDA = (
+    "Eres el asistente de una hoja de vida, pero todavía no hay ninguna "
+    "cargada en la base de datos. Responde en español que por ahora no tienes "
+    "la información del perfil y que lo intenten más tarde. No inventes datos "
+    "ni respondas sobre otros temas."
+)
+
+
+def sistema_para(conversacion: Conversation) -> str:
+    """
+    Las instrucciones del modelo segun el alcance de la conversacion.
+
+    En el chat de la hoja de vida se arma en cada mensaje con lo que hay en la
+    base, para que el asistente responda con el CV recien editado sin tener
+    que reiniciar nada.
+    """
+    if conversacion.scope != Conversation.Scope.RESUME:
+        return SISTEMA
+
+    hoja = hoja_de_vida_como_texto()
+    if hoja is None:
+        return SIN_HOJA_DE_VIDA
+
+    return f"{SISTEMA_HOJA_DE_VIDA}\n\n--- HOJA DE VIDA ---\n{hoja}"
+
 
 # Cuanta conversacion se le manda al modelo en cada turno.
 MAX_MENSAJES = 20
@@ -190,7 +237,7 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
     cuerpo = {
         "model": proveedor.modelo,
         "messages": [
-            {"role": "system", "content": SISTEMA},
+            {"role": "system", "content": sistema_para(conversacion)},
             *historial_para_modelo(conversacion),
         ],
         "temperature": settings.CHAT_TEMPERATURE,

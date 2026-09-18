@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { profile } from "@/data/resume"
+import { usePerfil } from "@/components/resume/resume-context"
 
 type Proyecto = {
   titulo: string
@@ -36,7 +36,14 @@ const PROYECTOS: Proyecto[] = [
       "Cada conversación queda guardada, con su historial.",
       "La llave del modelo no sale del servidor.",
     ],
-    stack: ["React", "TypeScript", "shadcn", "Django REST", "PostgreSQL", "SSE"],
+    stack: [
+      "React",
+      "TypeScript",
+      "shadcn",
+      "Django REST",
+      "PostgreSQL",
+      "SSE",
+    ],
   },
   {
     titulo: "BI con React TS",
@@ -48,11 +55,19 @@ const PROYECTOS: Proyecto[] = [
       "Ventas por país en un mapa con zoom.",
       "Filtros por mes, ventana, país y estado del pedido.",
     ],
-    stack: ["React", "TypeScript", "shadcn", "Recharts", "d3-geo", "Django REST"],
+    stack: [
+      "React",
+      "TypeScript",
+      "shadcn",
+      "Recharts",
+      "d3-geo",
+      "Django REST",
+    ],
   },
 ]
 
 export function ProyectosPage() {
+  const profile = usePerfil()
   return (
     <ChatProvider>
       <div className="min-h-svh bg-muted/40">
@@ -121,7 +136,7 @@ export function ProyectosPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              {profile.firstName} {profile.lastName} · {profile.title}
+              {profile.first_name} {profile.last_name} · {profile.title}
             </p>
           </div>
         </main>

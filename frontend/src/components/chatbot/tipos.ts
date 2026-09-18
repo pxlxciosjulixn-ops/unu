@@ -2,6 +2,13 @@
 
 export type Rol = "user" | "assistant"
 
+/**
+ * De qué habla el asistente en esa conversación: `general` es la página
+ * /chatbot y `resume` el chat flotante de la hoja de vida, que solo responde
+ * con lo que hay en el CV guardado en la base.
+ */
+export type Alcance = "general" | "resume"
+
 export type MensajeGuardado = {
   id: number
   role: Rol
@@ -12,6 +19,7 @@ export type MensajeGuardado = {
 export type Conversacion = {
   id: string
   title: string
+  scope: Alcance
   created_at: string
   updated_at: string
   message_count: number
