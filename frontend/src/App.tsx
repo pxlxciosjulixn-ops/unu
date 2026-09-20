@@ -31,6 +31,13 @@ const ProyectosPage = lazy(() =>
   }))
 )
 
+// Página personal suelta: no comparte cabecera ni tema con el resto.
+const Min2026Page = lazy(() =>
+  import("@/components/min/min-2026-page").then((m) => ({
+    default: m.Min2026Page,
+  }))
+)
+
 const LoginPage = lazy(() =>
   import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
 )
@@ -91,6 +98,14 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <ProyectosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/min-2026"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <Min2026Page />
               </Suspense>
             }
           />
