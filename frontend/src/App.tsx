@@ -38,6 +38,19 @@ const Min2026Page = lazy(() =>
   }))
 )
 
+// Finanzas personales: publicas pero sin enlace desde ningun lado del sitio.
+const FormularioGastosPage = lazy(() =>
+  import("@/components/finanzas/formulario-page").then((m) => ({
+    default: m.FormularioGastosPage,
+  }))
+)
+
+const DashboardGastosPage = lazy(() =>
+  import("@/components/finanzas/dashboard-gastos-page").then((m) => ({
+    default: m.DashboardGastosPage,
+  }))
+)
+
 const LoginPage = lazy(() =>
   import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
 )
@@ -106,6 +119,22 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <Min2026Page />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/formulario/gastos/julian/palacios"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <FormularioGastosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/dashboard/gastos/julian/palacios"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <DashboardGastosPage />
               </Suspense>
             }
           />

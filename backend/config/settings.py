@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "chat",
     "dashboard",
     "resume",
+    "finanzas",
 ]
 
 MIDDLEWARE = [
@@ -180,8 +181,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     # El chat gasta cuota del proveedor con cada llamada: se limita por IP.
-    # El login se limita para frenar los intentos a ciegas.
-    "DEFAULT_THROTTLE_RATES": {"chat": "20/min", "login": "10/min"},
+    # El login se limita para frenar los intentos a ciegas. El formulario de
+    # finanzas es publico: el cupo frena a un bot que dé con la ruta.
+    "DEFAULT_THROTTLE_RATES": {
+        "chat": "20/min",
+        "login": "10/min",
+        "finanzas": "30/min",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -287,3 +293,21 @@ CHAT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", os.getenv("NVIDIA_MAX_TOKENS"
 CHAT_TEMPERATURE = float(
     os.getenv("CHAT_TEMPERATURE", os.getenv("NVIDIA_TEMPERATURE", "0.7"))
 )
+
+# Correo por la API de Gmail (OAuth con refresh token, no SMTP): con eso el
+# servidor manda avisos sin guardar la contrasena de la cuenta. Si falta
+# cualquiera de las tres credenciales, los correos simplemente no salen.
+GMAIL_FROM = os.getenv("GMAIL_FROM", "")
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
+GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
+
+# A quien le llegan los avisos de finanzas personales.
+FINANZAS_CORREO_DESTINO = os.getenv(
+    "FINANZAS_CORREO_DESTINO", "pxlxciosjulixn@gmail.com"
+)
+# Direccion publica del dashboard, para el enlace de los correos. Vacia, el
+# correo sale sin enlace.
+FINANZAS_URL_DASHBOARD = os.getenv("FINANZAS_URL_DASHBOARD", "")
+# Apaga los correos de finanzas sin tocar las credenciales (pruebas locales).
+FINANZAS_AVISOS = env_bool("FINANZAS_AVISOS", default=True)

@@ -22,6 +22,7 @@ from django.conf import settings
 from django.db.models import F
 
 from chat.models import ChatQuota, Conversation, Message
+from finanzas.contexto import finanzas_como_texto
 from resume.contexto import hoja_de_vida_como_texto
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,33 @@ SIN_HOJA_DE_VIDA = (
 )
 
 
+# Instrucciones del asistente del dashboard de finanzas. Los datos se pegan
+# debajo, leidos de la base en ese momento.
+SISTEMA_FINANZAS = """\
+Eres un asesor experto en finanzas personales. Respondes preguntas sobre los
+gastos e ingresos que aparecen abajo, que son los de la persona que te habla.
+
+Reglas:
+1. Responde con los datos de abajo. Si la pregunta pide un dato que no está,
+   dilo en una línea; no inventes cifras. Usa las cifras, rankings y
+   diferencias tal como vienen calculadas; no las recalcules.
+   "¿En qué gasto más?" es el concepto 1 del ranking del mes; "¿qué subió?"
+   sale de la lista de cambios contra el mes pasado. No confundas las dos.
+2. Puedes dar consejos de ahorro, presupuesto y control de gastos basados en
+   esos datos. Si preguntan algo que no es de finanzas, di en una línea que
+   solo hablas de sus finanzas.
+3. Sé muy breve: 50 palabras como máximo. Una o dos frases, o tres viñetas
+   cortas. Nada de saludos, de repetir la pregunta ni de ofrecer más ayuda.
+4. Cifras en pesos con punto de miles, como en los datos ($ 1.234.567).
+5. Habla de tú y en español."""
+
+SIN_FINANZAS = (
+    "Eres un asesor de finanzas personales, pero todavía no hay ningún gasto "
+    "ni ingreso registrado. Responde en español, en una línea, que aún no hay "
+    "datos y que registre sus movimientos para poder analizarlos."
+)
+
+
 def sistema_para(conversacion: Conversation) -> str:
     """
     Las instrucciones del modelo segun el alcance de la conversacion.
@@ -78,6 +106,12 @@ def sistema_para(conversacion: Conversation) -> str:
     base, para que el asistente responda con el CV recien editado sin tener
     que reiniciar nada.
     """
+    if conversacion.scope == Conversation.Scope.FINANZAS:
+        datos = finanzas_como_texto()
+        if datos is None:
+            return SIN_FINANZAS
+        return f"{SISTEMA_FINANZAS}\n\n--- FINANZAS ---\n{datos}"
+
     if conversacion.scope != Conversation.Scope.RESUME:
         return SISTEMA
 
@@ -102,6 +136,20 @@ MAX_CARACTERES_RESUME = 300
 MAX_MENSAJES_RESUME = 6
 MAX_TOKENS_RESUME = 220
 
+# El asistente de finanzas es igual de escueto: preguntas de una línea y
+# respuestas de dos frases, con los datos del mes como contexto en cada turno.
+MAX_CARACTERES_FINANZAS = 200
+MAX_MENSAJES_FINANZAS = 6
+MAX_TOKENS_FINANZAS = 180
+# Aquí importan los datos exactos, no la creatividad: temperatura baja.
+TEMPERATURA_FINANZAS = 0.2
+
+# Alcances con preguntas cortas: el tope de caracteres se valida en la vista.
+MAX_CARACTERES_POR_ALCANCE: dict[str, int] = {
+    Conversation.Scope.RESUME: MAX_CARACTERES_RESUME,
+    Conversation.Scope.FINANZAS: MAX_CARACTERES_FINANZAS,
+}
+
 # Tope de salida del asistente general. Menos que los 4096 configurados: las
 # respuestas kilometricas cuestan y casi nunca se leen enteras. Alcanza para
 # una consulta SQL con su explicacion.
@@ -113,6 +161,7 @@ MAX_TOKENS_GENERAL = 600
 CUPO_POR_VISITANTE: dict[str, int | None] = {
     Conversation.Scope.GENERAL: 5,
     Conversation.Scope.RESUME: None,
+    Conversation.Scope.FINANZAS: None,
 }
 
 
@@ -183,6 +232,8 @@ def historial_para_modelo(conversacion: Conversation) -> list[dict[str, str]]:
     """Ultimos mensajes de la conversacion, recortados a los limites."""
     if conversacion.scope == Conversation.Scope.RESUME:
         cuantos, tope = MAX_MENSAJES_RESUME, MAX_CARACTERES_RESUME
+    elif conversacion.scope == Conversation.Scope.FINANZAS:
+        cuantos, tope = MAX_MENSAJES_FINANZAS, MAX_CARACTERES_FINANZAS
     else:
         cuantos, tope = MAX_MENSAJES, MAX_CARACTERES_MENSAJE
 
@@ -315,13 +366,18 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
             {"role": "system", "content": sistema_para(conversacion)},
             *historial_para_modelo(conversacion),
         ],
-        "temperature": settings.CHAT_TEMPERATURE,
+        "temperature": (
+            TEMPERATURA_FINANZAS
+            if conversacion.scope == Conversation.Scope.FINANZAS
+            else settings.CHAT_TEMPERATURE
+        ),
         "top_p": 0.95,
         "stream": True,
         **proveedor.limite_de_salida(
-            MAX_TOKENS_RESUME
-            if conversacion.scope == Conversation.Scope.RESUME
-            else MAX_TOKENS_GENERAL
+            {
+                Conversation.Scope.RESUME: MAX_TOKENS_RESUME,
+                Conversation.Scope.FINANZAS: MAX_TOKENS_FINANZAS,
+            }.get(conversacion.scope, MAX_TOKENS_GENERAL)
         ),
         **proveedor.extras(),
     }

@@ -16,6 +16,7 @@ class Conversation(models.Model):
     class Scope(models.TextChoices):
         GENERAL = "general", "Asistente general"
         RESUME = "resume", "Solo la hoja de vida"
+        FINANZAS = "finanzas", "Finanzas personales"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     visitor = models.CharField(

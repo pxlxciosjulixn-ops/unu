@@ -27,6 +27,7 @@ export function AppShell({
   sidebar,
   acciones,
   altoFijo = false,
+  raiz = { etiqueta: "Hoja de vida", to: "/" },
   children,
 }: {
   /** Último nivel de la ruta que se muestra en la barra superior. */
@@ -40,6 +41,8 @@ export function AppShell({
    * se vaya con la conversación.
    */
   altoFijo?: boolean
+  /** Primer nivel de la ruta. Por defecto, la hoja de vida. */
+  raiz?: { etiqueta: string; to: string }
   children: React.ReactNode
 }) {
   return (
@@ -55,12 +58,14 @@ export function AppShell({
           <Separator orientation="vertical" className="mr-1 h-5" />
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink render={<Link to="/" />}>
-                  Hoja de vida
+              {/* En el celular no cabe junto a los botones: queda solo el
+                  nivel actual, y la barra lateral lleva al resto. */}
+              <BreadcrumbItem className="hidden sm:inline-flex">
+                <BreadcrumbLink render={<Link to={raiz.to} />}>
+                  {raiz.etiqueta}
                 </BreadcrumbLink>
               </BreadcrumbItem>
-              <BreadcrumbSeparator />
+              <BreadcrumbSeparator className="hidden sm:block" />
               <BreadcrumbItem>
                 <BreadcrumbPage>{titulo}</BreadcrumbPage>
               </BreadcrumbItem>
