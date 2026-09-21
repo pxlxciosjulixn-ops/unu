@@ -16,6 +16,12 @@ export const RUTAS_FINANZAS = {
   formulario: "/formulario/gastos/julian/palacios",
 }
 
+/**
+ * Gastos fijos que se repiten cada mes. El formulario los sugiere en el campo
+ * de concepto, pero se puede escribir cualquier otro.
+ */
+export const CONCEPTOS_FIJOS = ["Mt15", "Nu", "Addi"]
+
 /** Los mismos topes que valida el modelo en Django. */
 export const CONCEPTO_MAX = 100
 export const VALOR_MAX = 999_999_999_999_999

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom"
 
 import {
   CONCEPTO_MAX,
+  CONCEPTOS_FIJOS,
   crearMovimiento,
   escribirValor,
   formatearFechaLocal,
@@ -23,6 +24,14 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
+import {
+  Autocomplete,
+  AutocompleteContent,
+  AutocompleteEmpty,
+  AutocompleteInput,
+  AutocompleteItem,
+  AutocompleteList,
+} from "@/components/ui/autocomplete"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -83,6 +92,8 @@ export function FormularioGastosPage() {
   // preview abierto, esto es exactamente lo que se envía al aceptar.
   const [preview, setPreview] = React.useState<NuevoMovimiento | null>(null)
   const conceptoRef = React.useRef<HTMLInputElement>(null)
+  // Los gastos fijos solo tienen sentido como gasto.
+  const sugerencias = tipo === "gasto" ? CONCEPTOS_FIJOS : []
 
   /** "Guardar" solo valida y abre la vista previa; aún no envía nada. */
   function revisar(evento: React.FormEvent<HTMLFormElement>) {
@@ -170,29 +181,53 @@ export function FormularioGastosPage() {
 
                 <Field data-invalid={errores.concepto ? true : undefined}>
                   <FieldLabel htmlFor="concepto">Concepto</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
+                  {/* Los gastos fijos salen en la lista, pero el campo es
+                      libre: lo que se escriba es lo que se guarda. */}
+                  <Autocomplete
+                    items={sugerencias}
+                    value={concepto}
+                    onValueChange={(texto) =>
+                      setConcepto(texto.slice(0, CONCEPTO_MAX))
+                    }
+                    openOnInputClick
+                  >
+                    <AutocompleteInput
                       ref={conceptoRef}
                       id="concepto"
-                      value={concepto}
                       maxLength={CONCEPTO_MAX}
-                      onChange={(e) => setConcepto(e.target.value)}
                       placeholder={
                         tipo === "gasto"
-                          ? "Mercado, arriendo, gasolina…"
+                          ? "Mt15, Nu, Addi o escribe otro…"
                           : "Salario, venta…"
                       }
-                      autoComplete="off"
                       aria-invalid={errores.concepto ? true : undefined}
+                      showTrigger={sugerencias.length > 0}
                       required
-                    />
-                    <InputGroupAddon align="inline-end">
+                    >
                       <InputGroupText className="tabular-nums">
                         {concepto.length}/{CONCEPTO_MAX}
                       </InputGroupText>
-                    </InputGroupAddon>
-                  </InputGroup>
-                  <FieldError>{errores.concepto}</FieldError>
+                    </AutocompleteInput>
+                    <AutocompleteContent>
+                      <AutocompleteEmpty>
+                        Se guardará tal como lo escribiste.
+                      </AutocompleteEmpty>
+                      <AutocompleteList>
+                        {(opcion: string) => (
+                          <AutocompleteItem key={opcion} value={opcion}>
+                            {opcion}
+                          </AutocompleteItem>
+                        )}
+                      </AutocompleteList>
+                    </AutocompleteContent>
+                  </Autocomplete>
+                  {errores.concepto ? (
+                    <FieldError>{errores.concepto}</FieldError>
+                  ) : sugerencias.length > 0 ? (
+                    <FieldDescription>
+                      Elige un gasto fijo o escribe otro concepto.
+                    </FieldDescription>
+                  ) : null}
                 </Field>
 
                 <Field data-invalid={errores.valor ? true : undefined}>
