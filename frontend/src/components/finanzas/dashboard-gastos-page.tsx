@@ -9,7 +9,9 @@ import {
   describirComparacion,
   describirPeriodo,
   filtrarAnterior,
+  filtrarConcepto,
   filtrarPeriodo,
+  opcionesDeConcepto,
   PERIODOS,
   RUTA_API,
   RUTAS_FINANZAS,
@@ -18,6 +20,7 @@ import {
   type Movimiento,
   type Periodo,
 } from "@/components/finanzas/finanzas"
+import { FiltroConcepto } from "@/components/finanzas/filtro-concepto"
 import { FinanzasShell } from "@/components/finanzas/finanzas-shell"
 import { GastosPorConcepto } from "@/components/finanzas/gastos-por-concepto"
 import { GraficaDistribucion } from "@/components/finanzas/grafica-distribucion"
@@ -44,11 +47,19 @@ import { useApi } from "@/hooks/use-api"
 export function DashboardGastosPage() {
   const { data, error, cargando, recargar } = useApi<Movimiento[]>(RUTA_API)
   const [periodo, setPeriodo] = React.useState<Periodo>("mes")
+  const [concepto, setConcepto] = React.useState<string | null>(null)
+
+  // Las opciones salen de todos los datos, no del periodo: un concepto sin
+  // movimientos este mes sigue apareciendo en la lista.
+  const opciones = React.useMemo(() => opcionesDeConcepto(data ?? []), [data])
 
   const calculos = React.useMemo(() => {
     if (!data) return null
-    const movimientos = filtrarPeriodo(data, periodo)
-    const anteriores = filtrarAnterior(data, periodo)
+    // Primero el concepto y después el periodo: así la comparación con el
+    // periodo anterior también es solo de ese concepto.
+    const delConcepto = filtrarConcepto(data, concepto)
+    const movimientos = filtrarPeriodo(delConcepto, periodo)
+    const anteriores = filtrarAnterior(delConcepto, periodo)
     return {
       movimientos,
       resumen: totales(movimientos),
@@ -56,7 +67,7 @@ export function DashboardGastosPage() {
       serie: serieTemporal(movimientos, periodo),
       datos: datosPeriodo(movimientos, periodo),
     }
-  }, [data, periodo])
+  }, [data, periodo, concepto])
 
   return (
     <FinanzasShell
@@ -94,29 +105,37 @@ export function DashboardGastosPage() {
             </h1>
             <p className="text-sm text-muted-foreground first-letter:uppercase">
               {describirPeriodo(periodo)}
+              {concepto ? ` · solo ${concepto}` : ""}
             </p>
           </div>
-          <ToggleGroup
-            variant="outline"
-            size="sm"
-            spacing={0}
-            value={[periodo]}
-            onValueChange={(valores: string[]) => {
-              if (valores[0]) setPeriodo(valores[0] as Periodo)
-            }}
-            aria-label="Periodo"
-            className="w-full lg:w-fit"
-          >
-            {PERIODOS.map((p) => (
-              <ToggleGroupItem
-                key={p.valor}
-                value={p.valor}
-                className="flex-1 lg:flex-none"
-              >
-                {p.etiqueta}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            <FiltroConcepto
+              valor={concepto}
+              opciones={opciones}
+              onChange={setConcepto}
+            />
+            <ToggleGroup
+              variant="outline"
+              size="sm"
+              spacing={0}
+              value={[periodo]}
+              onValueChange={(valores: string[]) => {
+                if (valores[0]) setPeriodo(valores[0] as Periodo)
+              }}
+              aria-label="Periodo"
+              className="w-full lg:w-fit"
+            >
+              {PERIODOS.map((p) => (
+                <ToggleGroupItem
+                  key={p.valor}
+                  value={p.valor}
+                  className="flex-1 lg:flex-none"
+                >
+                  {p.etiqueta}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
         </div>
 
         {error ? (
@@ -154,7 +173,10 @@ export function DashboardGastosPage() {
           <div className="min-w-0 lg:col-span-2 xl:col-span-1">
             <AsistenteFinanzas />
           </div>
-          <GastosPorConcepto movimientos={calculos?.movimientos ?? null} />
+          <GastosPorConcepto
+            movimientos={calculos?.movimientos ?? null}
+            onElegir={setConcepto}
+          />
           <DatosDelPeriodo datos={calculos?.datos ?? null} />
         </div>
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from finanzas import models
+from finanzas.conceptos import homogenizar
 
 
 class MovimientoSerializer(serializers.ModelSerializer):
@@ -12,9 +13,9 @@ class MovimientoSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
     def validate_concepto(self, valor: str) -> str:
-        # Sin espacios de sobra, para que "Mercado" y "Mercado " cuenten como
-        # el mismo concepto en el dashboard.
-        limpio = " ".join(valor.split())
+        # "mt15" se guarda como "Mt15" y "Mercado " como "Mercado": así el
+        # dashboard suma junto todo lo de un mismo concepto.
+        limpio = homogenizar(valor)
         if not limpio:
             raise serializers.ValidationError("Escribe el concepto.")
         return limpio

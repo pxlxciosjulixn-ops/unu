@@ -19,11 +19,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatearPesos, formatearPorcentaje } from "@/lib/format"
 
-/** Los conceptos más grandes del periodo, de gasto o de ingreso. */
+/**
+ * Los conceptos más grandes del periodo, de gasto o de ingreso. Un clic en
+ * uno filtra todo el dashboard por ese concepto.
+ */
 export function GastosPorConcepto({
   movimientos,
+  onElegir,
 }: {
   movimientos: Movimiento[] | null
+  onElegir: (concepto: string) => void
 }) {
   const [tipo, setTipo] = React.useState<Tipo>("gasto")
   const grupos = React.useMemo(
@@ -70,22 +75,30 @@ export function GastosPorConcepto({
             }
           />
         ) : (
-          <ul className="flex flex-col gap-4">
+          <ul className="flex flex-col gap-2">
             {grupos.map((g) => (
-              <li key={g.concepto} className="flex flex-col gap-1.5">
-                <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate" title={g.concepto}>
-                    {g.concepto}
+              <li key={g.concepto}>
+                {/* "Otros" junta varios conceptos: no tiene uno por el cual
+                    filtrar. */}
+                <button
+                  type="button"
+                  disabled={g.agrupado}
+                  onClick={() => onElegir(g.concepto)}
+                  title={g.agrupado ? undefined : `Ver solo ${g.concepto}`}
+                  className="-mx-2 flex w-[calc(100%+1rem)] flex-col gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none"
+                >
+                  <span className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate">{g.concepto}</span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      {formatearPesos(g.total)}
+                    </span>
                   </span>
-                  <span className="shrink-0 font-medium tabular-nums">
-                    {formatearPesos(g.total)}
+                  <Progress value={g.pct} aria-label={g.concepto} />
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {formatearPorcentaje(g.pct)} · {g.veces}{" "}
+                    {g.veces === 1 ? "movimiento" : "movimientos"}
                   </span>
-                </div>
-                <Progress value={g.pct} aria-label={g.concepto} />
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {formatearPorcentaje(g.pct)} · {g.veces}{" "}
-                  {g.veces === 1 ? "movimiento" : "movimientos"}
-                </span>
+                </button>
               </li>
             ))}
           </ul>

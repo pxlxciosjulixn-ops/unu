@@ -17,10 +17,46 @@ export const RUTAS_FINANZAS = {
 }
 
 /**
- * Gastos fijos que se repiten cada mes. El formulario los sugiere en el campo
- * de concepto, pero se puede escribir cualquier otro.
+ * Conceptos que se repiten. El formulario los sugiere mientras se escribe y,
+ * si lo escrito coincide con uno ("mt15", "MT15 "), se guarda con este nombre:
+ * así todo lo de un concepto suma junto en el dashboard.
+ *
+ * Es la misma lista de `backend/finanzas/conceptos.py`, que es la que manda al
+ * guardar. Si se cambia una, se cambia la otra.
  */
-export const CONCEPTOS_FIJOS = ["Mt15", "Nu", "Addi"]
+export const CONCEPTOS_FIJOS = [
+  "Mt15",
+  "Nu",
+  "Addi",
+  "Comida",
+  "Comida gatos",
+  "Prestamo",
+  "Abuelos",
+  "Pago deuda",
+  "Gasolina",
+  "Mama",
+]
+
+/** Forma de comparar conceptos: sin tildes, en minúsculas, espacios simples. */
+export function claveConcepto(texto: string) {
+  return texto
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es-CO")
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(" ")
+}
+
+const FIJOS_POR_CLAVE = new Map(
+  CONCEPTOS_FIJOS.map((nombre) => [claveConcepto(nombre), nombre])
+)
+
+/** El nombre de la lista si coincide; si no, lo escrito sin espacios de sobra. */
+export function homogenizarConcepto(texto: string) {
+  const limpio = texto.split(/\s+/).filter(Boolean).join(" ")
+  return FIJOS_POR_CLAVE.get(claveConcepto(limpio)) ?? limpio
+}
 
 /** Los mismos topes que valida el modelo en Django. */
 export const CONCEPTO_MAX = 100
@@ -381,11 +417,14 @@ export type GrupoConcepto = {
   total: number
   veces: number
   pct: number
+  /** La fila "Otros (n)", que junta varios conceptos. */
+  agrupado?: boolean
 }
 
 /**
  * Movimientos de un tipo agrupados por concepto, de mayor a menor. "Mercado"
- * y "mercado" cuentan juntos y se muestra la forma escrita más reciente.
+ * y "mercado" cuentan juntos; los conceptos fijos salen con su nombre de la
+ * lista y los demás con la forma escrita más reciente.
  * Pasado el tope, lo demás se junta en "Otros".
  */
 export function porConcepto(
@@ -404,14 +443,14 @@ export function porConcepto(
   for (const m of movimientos) {
     if (m.tipo !== tipo) continue
     total += m.valor
-    const clave = m.concepto.trim().toLocaleLowerCase("es-CO")
+    const clave = claveConcepto(m.concepto)
     const grupo = grupos.get(clave)
     if (grupo) {
       grupo.total += m.valor
       grupo.veces += 1
     } else {
       grupos.set(clave, {
-        concepto: m.concepto.trim(),
+        concepto: homogenizarConcepto(m.concepto),
         total: m.valor,
         veces: 1,
       })
@@ -419,10 +458,11 @@ export function porConcepto(
   }
 
   const ordenados = [...grupos.values()].sort((a, b) => b.total - a.total)
-  const visibles = ordenados.slice(0, tope)
+  const visibles: Omit<GrupoConcepto, "pct">[] = ordenados.slice(0, tope)
   const resto = ordenados.slice(tope)
   if (resto.length) {
     visibles.push({
+      agrupado: true,
       concepto: `Otros (${resto.length})`,
       total: resto.reduce((suma, g) => suma + g.total, 0),
       veces: resto.reduce((suma, g) => suma + g.veces, 0),
@@ -466,7 +506,7 @@ export function datosPeriodo(
   for (const m of movimientos) {
     if (m.tipo === "gasto") {
       gastos += m.valor
-      conceptos.add(m.concepto.trim().toLocaleLowerCase("es-CO"))
+      conceptos.add(claveConcepto(m.concepto))
       if (!mayorGasto || m.valor > mayorGasto.valor) mayorGasto = m
     } else if (!mayorIngreso || m.valor > mayorIngreso.valor) {
       mayorIngreso = m
@@ -480,5 +520,39 @@ export function datosPeriodo(
     mayorIngreso,
     movimientos: movimientos.length,
     conceptosDeGasto: conceptos.size,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filtro por concepto
+// ---------------------------------------------------------------------------
+
+/** Solo los movimientos de ese concepto; `null` es sin filtro. */
+export function filtrarConcepto(
+  movimientos: Movimiento[],
+  concepto: string | null
+) {
+  if (!concepto) return movimientos
+  const buscada = claveConcepto(concepto)
+  return movimientos.filter((m) => claveConcepto(m.concepto) === buscada)
+}
+
+/**
+ * Opciones del filtro: los conceptos fijos (siempre, aunque aún no tengan
+ * movimientos) y aparte los demás que aparezcan en los datos, en orden
+ * alfabético.
+ */
+export function opcionesDeConcepto(movimientos: Movimiento[]) {
+  const fijas = new Set(CONCEPTOS_FIJOS.map(claveConcepto))
+  const otros = new Map<string, string>()
+  for (const m of movimientos) {
+    const clave = claveConcepto(m.concepto)
+    if (!fijas.has(clave) && !otros.has(clave)) {
+      otros.set(clave, homogenizarConcepto(m.concepto))
+    }
+  }
+  return {
+    fijos: CONCEPTOS_FIJOS,
+    otros: [...otros.values()].sort((a, b) => a.localeCompare(b, "es-CO")),
   }
 }

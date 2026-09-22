@@ -8,6 +8,7 @@ import {
   crearMovimiento,
   escribirValor,
   formatearFechaLocal,
+  homogenizarConcepto,
   hoyISO,
   leerValor,
   RUTAS_FINANZAS,
@@ -27,7 +28,6 @@ import {
 import {
   Autocomplete,
   AutocompleteContent,
-  AutocompleteEmpty,
   AutocompleteInput,
   AutocompleteItem,
   AutocompleteList,
@@ -74,10 +74,10 @@ import { formatearPesos } from "@/lib/format"
  * Página suelta: /formulario/gastos/julian/palacios.
  *
  * Sin login a propósito: la protege que la dirección no está enlazada desde
- * el resto del sitio; solo el dashboard de finanzas apunta aquí. "Guardar" abre primero una vista previa y solo al aceptar
- * se envía. Después de guardar se limpian concepto y valor pero se
- * conservan fecha y tipo, que es lo que se repite al anotar varios gastos del
- * mismo día.
+ * el resto del sitio; solo el dashboard de finanzas apunta aquí. "Guardar"
+ * abre primero una vista previa y solo al aceptar se envía. Después de
+ * guardar se limpian concepto y valor pero se conservan fecha y tipo, que es
+ * lo que se repite al anotar varios gastos del mismo día.
  */
 export function FormularioGastosPage() {
   const [fecha, setFecha] = React.useState(hoyISO)
@@ -92,8 +92,6 @@ export function FormularioGastosPage() {
   // preview abierto, esto es exactamente lo que se envía al aceptar.
   const [preview, setPreview] = React.useState<NuevoMovimiento | null>(null)
   const conceptoRef = React.useRef<HTMLInputElement>(null)
-  // Los gastos fijos solo tienen sentido como gasto.
-  const sugerencias = tipo === "gasto" ? CONCEPTOS_FIJOS : []
 
   /** "Guardar" solo valida y abre la vista previa; aún no envía nada. */
   function revisar(evento: React.FormEvent<HTMLFormElement>) {
@@ -104,7 +102,9 @@ export function FormularioGastosPage() {
     if (Object.keys(encontrados).length > 0 || valor === null) return
 
     setGuardado(null)
-    setPreview({ fecha, tipo, concepto: concepto.trim(), valor })
+    // "mt15" se muestra y se guarda como "Mt15": lo que se ve en la vista
+    // previa es lo mismo que va a quedar en el dashboard.
+    setPreview({ fecha, tipo, concepto: homogenizarConcepto(concepto), valor })
   }
 
   async function confirmar() {
@@ -181,37 +181,32 @@ export function FormularioGastosPage() {
 
                 <Field data-invalid={errores.concepto ? true : undefined}>
                   <FieldLabel htmlFor="concepto">Concepto</FieldLabel>
-                  {/* Los gastos fijos salen en la lista, pero el campo es
-                      libre: lo que se escriba es lo que se guarda. */}
+                  {/* Las sugerencias salen mientras se escribe. El campo es
+                      libre, pero si lo escrito es uno de la lista se guarda
+                      con ese nombre. */}
                   <Autocomplete
-                    items={sugerencias}
+                    items={CONCEPTOS_FIJOS}
                     value={concepto}
                     onValueChange={(texto) =>
                       setConcepto(texto.slice(0, CONCEPTO_MAX))
                     }
-                    openOnInputClick
                   >
                     <AutocompleteInput
                       ref={conceptoRef}
                       id="concepto"
                       maxLength={CONCEPTO_MAX}
-                      placeholder={
-                        tipo === "gasto"
-                          ? "Mt15, Nu, Addi o escribe otro…"
-                          : "Salario, venta…"
-                      }
+                      placeholder="Ej.: Comida, Nu, Mama…"
                       aria-invalid={errores.concepto ? true : undefined}
-                      showTrigger={sugerencias.length > 0}
+                      showTrigger={false}
                       required
                     >
                       <InputGroupText className="tabular-nums">
                         {concepto.length}/{CONCEPTO_MAX}
                       </InputGroupText>
                     </AutocompleteInput>
-                    <AutocompleteContent>
-                      <AutocompleteEmpty>
-                        Se guardará tal como lo escribiste.
-                      </AutocompleteEmpty>
+                    {/* Sin coincidencias la lista se esconde: escribir un
+                        concepto nuevo no llena la pantalla de avisos. */}
+                    <AutocompleteContent className="data-empty:hidden">
                       <AutocompleteList>
                         {(opcion: string) => (
                           <AutocompleteItem key={opcion} value={opcion}>
@@ -223,11 +218,11 @@ export function FormularioGastosPage() {
                   </Autocomplete>
                   {errores.concepto ? (
                     <FieldError>{errores.concepto}</FieldError>
-                  ) : sugerencias.length > 0 ? (
+                  ) : (
                     <FieldDescription>
-                      Elige un gasto fijo o escribe otro concepto.
+                      Elige uno de la lista o escribe otro concepto.
                     </FieldDescription>
-                  ) : null}
+                  )}
                 </Field>
 
                 <Field data-invalid={errores.valor ? true : undefined}>

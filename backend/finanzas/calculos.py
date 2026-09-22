@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from django.db.models import Count, Sum
 from django.db.models.functions import Lower, Trim
 
+from finanzas.conceptos import CONCEPTOS_FIJOS, homogenizar
 from finanzas.models import Movimiento
 
 MESES = [
@@ -82,6 +83,12 @@ def _del_mes(mes: date):
     return Movimiento.objects.filter(fecha__gte=inicio, fecha__lt=mes_siguiente(inicio))
 
 
+def _nombre(texto: str) -> str:
+    """El nombre de la lista si es un concepto fijo; si no, con mayúscula inicial."""
+    fijo = homogenizar(texto)
+    return fijo if fijo in CONCEPTOS_FIJOS else texto.capitalize()
+
+
 def resumen_mes(mes: date, top: int = 5) -> ResumenMes:
     consulta = _del_mes(mes)
     resumen = ResumenMes(mes=primer_dia(mes))
@@ -101,7 +108,7 @@ def resumen_mes(mes: date, top: int = 5) -> ResumenMes:
         .order_by("-total")[:top]
     )
     resumen.conceptos_gasto = [
-        Concepto(nombre=g["clave"].capitalize(), total=g["total"], veces=g["veces"])
+        Concepto(nombre=_nombre(g["clave"]), total=g["total"], veces=g["veces"])
         for g in grupos
     ]
     return resumen
