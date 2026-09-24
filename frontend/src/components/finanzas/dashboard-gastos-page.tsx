@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import { AsistenteFinanzas } from "@/components/finanzas/asistente-finanzas"
 import { DatosDelPeriodo } from "@/components/finanzas/datos-periodo"
 import {
+  compararConcepto,
   datosPeriodo,
   describirComparacion,
   describirPeriodo,
@@ -26,6 +27,7 @@ import { GastosPorConcepto } from "@/components/finanzas/gastos-por-concepto"
 import { GraficaDistribucion } from "@/components/finanzas/grafica-distribucion"
 import { GraficaEvolucion } from "@/components/finanzas/grafica-evolucion"
 import { TablaMovimientos } from "@/components/finanzas/tabla-movimientos"
+import { TarjetasConcepto } from "@/components/finanzas/tarjetas-concepto"
 import { TarjetasResumen } from "@/components/finanzas/tarjetas-resumen"
 import { useSugerencias } from "@/components/finanzas/use-sugerencias"
 import {
@@ -65,10 +67,17 @@ export function DashboardGastosPage() {
     const delConcepto = filtrarConcepto(data, concepto)
     const movimientos = filtrarPeriodo(delConcepto, periodo)
     const anteriores = filtrarAnterior(delConcepto, periodo)
+    // El periodo entero, sin el filtro: con un concepto elegido, sus propios
+    // ingresos suelen ser cero y es contra esto que hay que medirlo.
+    const todos = concepto ? filtrarPeriodo(data, periodo) : movimientos
     return {
       movimientos,
+      todos,
       resumen: totales(movimientos),
       resumenAnterior: anteriores ? totales(anteriores) : null,
+      comparacion: concepto
+        ? compararConcepto(movimientos, todos, concepto)
+        : null,
       serie: serieTemporal(movimientos, periodo),
       datos: datosPeriodo(movimientos, periodo),
     }
@@ -159,19 +168,34 @@ export function DashboardGastosPage() {
         ) : null}
 
         <section id="resumen" className="scroll-mt-20">
-          <TarjetasResumen
-            actual={calculos?.resumen ?? null}
-            anterior={calculos?.resumenAnterior ?? null}
-            comparacion={describirComparacion(periodo)}
-          />
+          {/* Con un concepto elegido las cuatro cifras de siempre no dicen
+              nada (ingresos en cero, ahorro en "—"): en su lugar va cuánto
+              pesa ese concepto dentro del periodo. */}
+          {concepto ? (
+            <TarjetasConcepto
+              comparacion={calculos?.comparacion ?? null}
+              anterior={calculos?.resumenAnterior ?? null}
+              descripcionComparacion={describirComparacion(periodo)}
+            />
+          ) : (
+            <TarjetasResumen
+              actual={calculos?.resumen ?? null}
+              anterior={calculos?.resumenAnterior ?? null}
+              comparacion={describirComparacion(periodo)}
+            />
+          )}
         </section>
 
         <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <GraficaEvolucion
             serie={calculos?.serie ?? null}
             porDia={periodo === "mes"}
+            concepto={concepto}
           />
-          <GraficaDistribucion resumen={calculos?.resumen ?? null} />
+          <GraficaDistribucion
+            resumen={calculos?.resumen ?? null}
+            comparacion={calculos?.comparacion ?? null}
+          />
         </div>
 
         <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-3">
@@ -179,7 +203,8 @@ export function DashboardGastosPage() {
             <AsistenteFinanzas />
           </div>
           <GastosPorConcepto
-            movimientos={calculos?.movimientos ?? null}
+            movimientos={calculos?.todos ?? null}
+            activo={concepto}
             onElegir={setConcepto}
           />
           <DatosDelPeriodo datos={calculos?.datos ?? null} />

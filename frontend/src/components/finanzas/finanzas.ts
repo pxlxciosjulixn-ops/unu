@@ -593,6 +593,62 @@ export function filtrarConcepto(
 }
 
 /**
+ * Un concepto medido contra el periodo completo.
+ *
+ * Con el filtro puesto, el resto del dashboard solo ve los movimientos de ese
+ * concepto: sus ingresos quedan en cero y no hay contra qué comparar. Esto
+ * guarda las dos referencias que faltan —lo que entró y lo que se gastó en
+ * todo el periodo— para poder decir qué parte del gasto es y cuánto se lleva
+ * de lo que entró.
+ */
+export type ComparacionConcepto = {
+  concepto: string
+  /** Si lo que se mueve bajo ese concepto es plata que entra. */
+  esIngreso: boolean
+  total: number
+  veces: number
+  promedio: number
+  /** Total del periodo del mismo lado: gastos si es gasto, ingresos si entra. */
+  totalPropio: number
+  /** Total del periodo del otro lado, que es la referencia que se perdía. */
+  totalCruzado: number
+  /** Parte del lado propio, 0–100; `null` si ese lado está en cero. */
+  pctPropio: number | null
+  /** Parte del otro lado, 0–100; `null` si ese lado está en cero. */
+  pctCruzado: number | null
+}
+
+export function compararConcepto(
+  /** Movimientos del concepto en el periodo. */
+  movimientos: Movimiento[],
+  /** Todos los del periodo, sin el filtro de concepto. */
+  todos: Movimiento[],
+  concepto: string
+): ComparacionConcepto {
+  const propio = totales(movimientos)
+  const periodo = totales(todos)
+  // Un concepto suele ser de un solo lado; si tiene de los dos, manda el que
+  // pese más (un "Prestamo" que a veces entra y a veces sale).
+  const esIngreso = propio.ingresos > propio.gastos
+  const total = esIngreso ? propio.ingresos : propio.gastos
+  const totalPropio = esIngreso ? periodo.ingresos : periodo.gastos
+  const totalCruzado = esIngreso ? periodo.gastos : periodo.ingresos
+  const veces = movimientos.length
+
+  return {
+    concepto,
+    esIngreso,
+    total,
+    veces,
+    promedio: veces > 0 ? Math.round(total / veces) : 0,
+    totalPropio,
+    totalCruzado,
+    pctPropio: totalPropio > 0 ? (total / totalPropio) * 100 : null,
+    pctCruzado: totalCruzado > 0 ? (total / totalCruzado) * 100 : null,
+  }
+}
+
+/**
  * Opciones del filtro: las sugerencias (siempre, aunque aún no tengan
  * movimientos) y aparte los demás conceptos que aparezcan en los datos, en
  * orden alfabético.

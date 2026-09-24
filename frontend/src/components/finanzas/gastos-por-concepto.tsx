@@ -1,6 +1,7 @@
 import * as React from "react"
 
 import {
+  claveConcepto,
   porConcepto,
   type Movimiento,
   type Tipo,
@@ -18,17 +19,25 @@ import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatearPesos, formatearPorcentaje } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 /**
  * Los conceptos más grandes del periodo, de gasto o de ingreso. Un clic en
- * uno filtra todo el dashboard por ese concepto.
+ * uno filtra todo el dashboard por ese concepto y otro clic lo suelta.
+ *
+ * Es la única tarjeta que no hace caso al filtro: recibe el periodo completo
+ * y marca el concepto elegido. Filtrada mostraría una sola barra al 100 %, y
+ * lo que se quiere ver aquí es justo contra qué compite.
  */
 export function GastosPorConcepto({
   movimientos,
+  activo,
   onElegir,
 }: {
   movimientos: Movimiento[] | null
-  onElegir: (concepto: string) => void
+  /** El concepto por el que está filtrado el dashboard; `null` si ninguno. */
+  activo: string | null
+  onElegir: (concepto: string | null) => void
 }) {
   const [tipo, setTipo] = React.useState<Tipo>("gasto")
   const grupos = React.useMemo(
@@ -42,7 +51,9 @@ export function GastosPorConcepto({
         <CardTitle>
           {tipo === "gasto" ? "¿En qué se va la plata?" : "¿De dónde entra?"}
         </CardTitle>
-        <CardDescription>Por concepto</CardDescription>
+        <CardDescription>
+          {activo ? "Todo el periodo, sin el filtro" : "Por concepto"}
+        </CardDescription>
         <CardAction>
           <ToggleGroup
             variant="outline"
@@ -76,16 +87,31 @@ export function GastosPorConcepto({
           />
         ) : (
           <ul className="flex flex-col gap-2">
-            {grupos.map((g) => (
+            {grupos.map((g) => {
+              const marcado =
+                activo !== null &&
+                !g.agrupado &&
+                claveConcepto(g.concepto) === claveConcepto(activo)
+              return (
               <li key={g.concepto}>
                 {/* "Otros" junta varios conceptos: no tiene uno por el cual
                     filtrar. */}
                 <button
                   type="button"
                   disabled={g.agrupado}
-                  onClick={() => onElegir(g.concepto)}
-                  title={g.agrupado ? undefined : `Ver solo ${g.concepto}`}
-                  className="-mx-2 flex w-[calc(100%+1rem)] flex-col gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none"
+                  aria-pressed={g.agrupado ? undefined : marcado}
+                  onClick={() => onElegir(marcado ? null : g.concepto)}
+                  title={
+                    g.agrupado
+                      ? undefined
+                      : marcado
+                        ? "Quitar el filtro"
+                        : `Ver solo ${g.concepto}`
+                  }
+                  className={cn(
+                    "-mx-2 flex w-[calc(100%+1rem)] flex-col gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none",
+                    marcado && "bg-muted ring-1 ring-foreground/10"
+                  )}
                 >
                   <span className="flex items-baseline justify-between gap-3 text-sm">
                     <span className="min-w-0 truncate">{g.concepto}</span>
@@ -100,7 +126,8 @@ export function GastosPorConcepto({
                   </span>
                 </button>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </CardContent>

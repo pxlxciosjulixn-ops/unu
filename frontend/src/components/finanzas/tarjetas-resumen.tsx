@@ -1,6 +1,5 @@
-import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react"
-
 import { variacion, type Totales } from "@/components/finanzas/finanzas"
+import { Variacion } from "@/components/finanzas/variacion"
 import {
   Card,
   CardContent,
@@ -112,44 +111,5 @@ function TarjetaPesos({
         <Variacion cambio={cambio} comparacion={comparacion} />
       </CardFooter>
     </Card>
-  )
-}
-
-function Variacion({
-  cambio,
-  comparacion,
-}: {
-  cambio: number | null
-  comparacion: string | null
-}) {
-  if (comparacion === null) {
-    return (
-      <span className="text-xs text-muted-foreground">Todo el historial</span>
-    )
-  }
-  if (cambio === null) {
-    return (
-      <span className="text-xs text-muted-foreground">
-        Sin datos para comparar
-      </span>
-    )
-  }
-
-  const Icono =
-    Math.abs(cambio) < 0.05
-      ? MinusIcon
-      : cambio > 0
-        ? TrendingUpIcon
-        : TrendingDownIcon
-
-  return (
-    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-      <span className="flex items-center gap-1 font-medium text-foreground tabular-nums">
-        <Icono className="size-3.5" />
-        {cambio > 0 ? "+" : ""}
-        {formatearPorcentaje(cambio)}
-      </span>
-      {comparacion}
-    </span>
   )
 }

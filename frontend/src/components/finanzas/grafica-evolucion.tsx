@@ -34,26 +34,42 @@ type Vista = "periodo" | "acumulado"
  * Ingresos y gastos en el tiempo. La vista acumulada muestra cuánto va
  * sumando cada línea: cuando la de gastos alcanza a la de ingresos, se acabó
  * lo que entró en el periodo.
+ *
+ * La línea de un lado sin movimientos no se dibuja: con un concepto de gasto
+ * filtrado, la de ingresos sería una raya pegada al cero que solo aplasta la
+ * otra contra el techo de la gráfica.
  */
 export function GraficaEvolucion({
   serie,
   porDia,
+  concepto,
 }: {
   serie: PuntoSerie[] | null
   porDia: boolean
+  /** El concepto filtrado, para nombrar la gráfica; `null` sin filtro. */
+  concepto?: string | null
 }) {
   const [vista, setVista] = React.useState<Vista>("periodo")
   const datos = React.useMemo(
     () => (serie && vista === "acumulado" ? acumular(serie) : serie),
     [serie, vista]
   )
-  const vacia =
-    serie !== null && serie.every((p) => p.ingresos === 0 && p.gastos === 0)
+  const hayIngresos = serie !== null && serie.some((p) => p.ingresos > 0)
+  const hayGastos = serie !== null && serie.some((p) => p.gastos > 0)
+  const vacia = serie !== null && !hayIngresos && !hayGastos
 
   return (
     <Card id="evolucion" className="scroll-mt-20">
       <CardHeader>
-        <CardTitle>Ingresos contra gastos</CardTitle>
+        <CardTitle className="truncate">
+          {concepto
+            ? concepto
+            : hayIngresos && !hayGastos
+              ? "Ingresos"
+              : hayGastos && !hayIngresos
+                ? "Gastos"
+                : "Ingresos contra gastos"}
+        </CardTitle>
         <CardDescription>
           {vista === "acumulado"
             ? "Lo que va sumando cada uno en el periodo"
@@ -135,27 +151,31 @@ export function GraficaEvolucion({
               />
               {/* Tramos rectos, sin suavizar: una curva inventaría valores
                   entre dos puntos (y hasta bajaría de cero). */}
-              <Line
-                dataKey="ingresos"
-                type="linear"
-                stroke="var(--color-ingresos)"
-                strokeWidth={2.5}
-                dot={datos.length <= 16 ? { r: 3 } : false}
-                activeDot={{ r: 5 }}
-                isAnimationActive={false}
-              />
+              {hayIngresos ? (
+                <Line
+                  dataKey="ingresos"
+                  type="linear"
+                  stroke="var(--color-ingresos)"
+                  strokeWidth={2.5}
+                  dot={datos.length <= 16 ? { r: 3 } : false}
+                  activeDot={{ r: 5 }}
+                  isAnimationActive={false}
+                />
+              ) : null}
               {/* Gastos punteada: en escala de grises, la forma distingue las
                   dos líneas mejor que el tono. */}
-              <Line
-                dataKey="gastos"
-                type="linear"
-                stroke="var(--color-gastos)"
-                strokeWidth={2.5}
-                strokeDasharray="6 4"
-                dot={datos.length <= 16 ? { r: 3 } : false}
-                activeDot={{ r: 5 }}
-                isAnimationActive={false}
-              />
+              {hayGastos ? (
+                <Line
+                  dataKey="gastos"
+                  type="linear"
+                  stroke="var(--color-gastos)"
+                  strokeWidth={2.5}
+                  strokeDasharray="6 4"
+                  dot={datos.length <= 16 ? { r: 3 } : false}
+                  activeDot={{ r: 5 }}
+                  isAnimationActive={false}
+                />
+              ) : null}
               <ChartLegend content={<ChartLegendContent />} />
             </LineChart>
           </ChartContainer>
