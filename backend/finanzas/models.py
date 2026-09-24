@@ -11,6 +11,8 @@ from __future__ import annotations
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from finanzas.conceptos import clave as clave_de_concepto
+
 CONCEPTO_MAX = 100
 
 # Cabe de sobra en un BigInteger y sigue siendo exacto en un `number` de
@@ -41,6 +43,41 @@ class Movimiento(models.Model):
 
     def __str__(self) -> str:
         return f"{self.fecha} · {self.get_tipo_display()} · {self.concepto}"
+
+
+class Sugerencia(models.Model):
+    """
+    Conceptos que se sugieren al escribir.
+
+    `clave` es el nombre sin tildes, en minusculas y con espacios simples: es
+    lo unico que impide dos sugerencias que solo se distinguen por como se
+    escriben ("Mt15" y "mt15 "), y es tambien con lo que `conceptos.homogenizar`
+    decide que un movimiento anotado como "mt15" se guarde como "Mt15", para
+    que todo lo de un concepto sume junto en el dashboard.
+
+    La lista arranca con los conceptos de `conceptos.CONCEPTOS_SEMILLA` (los
+    sembro la migracion 0004), pero desde ahi manda la tabla: lo que se agregue
+    o se borre en la pagina de edicion es lo que se sugiere y lo que homogeniza.
+    """
+
+    nombre = models.CharField("nombre", max_length=CONCEPTO_MAX)
+    clave = models.CharField(
+        "clave", max_length=CONCEPTO_MAX, unique=True, editable=False
+    )
+    created_at = models.DateTimeField("creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "sugerencia"
+        verbose_name_plural = "sugerencias"
+
+    def save(self, *args, **kwargs):
+        self.nombre = " ".join(self.nombre.split())
+        self.clave = clave_de_concepto(self.nombre)
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.nombre
 
 
 class AvisoEnviado(models.Model):

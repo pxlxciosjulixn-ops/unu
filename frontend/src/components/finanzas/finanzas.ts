@@ -9,22 +9,24 @@
 import { ApiError, fetchJson } from "@/lib/api"
 
 export const RUTA_API = "/api/finanzas/movimientos/"
+export const RUTA_API_SUGERENCIAS = "/api/finanzas/sugerencias/"
 
-/** Las dos páginas. No se enlazan desde ninguna otra parte del sitio. */
+/** Las tres páginas. No se enlazan desde ninguna otra parte del sitio. */
 export const RUTAS_FINANZAS = {
   dashboard: "/dashboard/gastos/julian/palacios",
   formulario: "/formulario/gastos/julian/palacios",
+  editar: "/editar/gastos/julian/palacios",
 }
 
 /**
- * Conceptos que se repiten. El formulario los sugiere mientras se escribe y,
- * si lo escrito coincide con uno ("mt15", "MT15 "), se guarda con este nombre:
- * así todo lo de un concepto suma junto en el dashboard.
+ * Las sugerencias de verdad viven en el backend y se piden con
+ * `listarSugerencias`; se agregan y se quitan desde la página de edición.
  *
- * Es la misma lista de `backend/finanzas/conceptos.py`, que es la que manda al
- * guardar. Si se cambia una, se cambia la otra.
+ * Esta lista es solo el respaldo con el que arrancó la tabla: se usa mientras
+ * la petición no ha llegado o si falló, para que el formulario nunca quede sin
+ * sugerencias.
  */
-export const CONCEPTOS_FIJOS = [
+export const CONCEPTOS_POR_DEFECTO = [
   "Mt15",
   "Nu",
   "Addi",
@@ -37,6 +39,12 @@ export const CONCEPTOS_FIJOS = [
   "Mama",
 ]
 
+export type Sugerencia = {
+  id: number
+  nombre: string
+  created_at: string
+}
+
 /** Forma de comparar conceptos: sin tildes, en minúsculas, espacios simples. */
 export function claveConcepto(texto: string) {
   return texto
@@ -48,14 +56,31 @@ export function claveConcepto(texto: string) {
     .join(" ")
 }
 
-const FIJOS_POR_CLAVE = new Map(
-  CONCEPTOS_FIJOS.map((nombre) => [claveConcepto(nombre), nombre])
-)
-
-/** El nombre de la lista si coincide; si no, lo escrito sin espacios de sobra. */
-export function homogenizarConcepto(texto: string) {
+/**
+ * El nombre de la sugerencia que coincida; si no, lo escrito sin espacios de
+ * sobra. Es lo mismo que hace el backend al guardar, repetido aquí para poder
+ * mostrar en la vista previa lo que va a quedar guardado.
+ */
+export function homogenizarConcepto(
+  texto: string,
+  sugerencias: string[] = CONCEPTOS_POR_DEFECTO
+) {
   const limpio = texto.split(/\s+/).filter(Boolean).join(" ")
-  return FIJOS_POR_CLAVE.get(claveConcepto(limpio)) ?? limpio
+  return porClave(sugerencias).get(claveConcepto(limpio)) ?? limpio
+}
+
+// El índice se arma una vez por lista: `porConcepto` homogeniza cada
+// movimiento y rehacerlo en cada llamada sería recorrer las sugerencias
+// enteras por fila.
+const indices = new WeakMap<string[], Map<string, string>>()
+
+function porClave(sugerencias: string[]) {
+  let indice = indices.get(sugerencias)
+  if (!indice) {
+    indice = new Map(sugerencias.map((n) => [claveConcepto(n), n]))
+    indices.set(sugerencias, indice)
+  }
+  return indice
 }
 
 /** Los mismos topes que valida el modelo en Django. */
@@ -82,24 +107,54 @@ export type NuevoMovimiento = Pick<
 /** Errores por campo del formulario. */
 export type ErroresCampo = Partial<Record<keyof NuevoMovimiento, string>>
 
-export async function crearMovimiento(datos: NuevoMovimiento) {
+/**
+ * Envía algo a la API y traduce el 429 del cupo por IP, que es el único error
+ * con un mensaje que le sirve a quien está en la página.
+ */
+async function escribir<T>(path: string, method: string, datos?: unknown) {
   try {
-    return await fetchJson<Movimiento>(RUTA_API, {
-      method: "POST",
+    return await fetchJson<T>(path, {
+      method,
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(datos),
+      body: datos === undefined ? undefined : JSON.stringify(datos),
     })
   } catch (error) {
     if (error instanceof ApiError && error.status === 429) {
-      throw new Error("Demasiados registros seguidos. Espera un minuto.", {
+      throw new Error("Demasiados cambios seguidos. Espera un minuto.", {
         cause: error,
       })
     }
     throw error
   }
+}
+
+export function crearMovimiento(datos: NuevoMovimiento) {
+  return escribir<Movimiento>(RUTA_API, "POST", datos)
+}
+
+export function actualizarMovimiento(id: number, datos: NuevoMovimiento) {
+  return escribir<Movimiento>(`${RUTA_API}${id}/`, "PUT", datos)
+}
+
+export function eliminarMovimiento(id: number) {
+  return escribir<void>(`${RUTA_API}${id}/`, "DELETE")
+}
+
+export function crearSugerencia(nombre: string) {
+  return escribir<Sugerencia>(RUTA_API_SUGERENCIAS, "POST", { nombre })
+}
+
+export function renombrarSugerencia(id: number, nombre: string) {
+  return escribir<Sugerencia>(`${RUTA_API_SUGERENCIAS}${id}/`, "PATCH", {
+    nombre,
+  })
+}
+
+export function eliminarSugerencia(id: number) {
+  return escribir<void>(`${RUTA_API_SUGERENCIAS}${id}/`, "DELETE")
 }
 
 /**
@@ -538,21 +593,24 @@ export function filtrarConcepto(
 }
 
 /**
- * Opciones del filtro: los conceptos fijos (siempre, aunque aún no tengan
- * movimientos) y aparte los demás que aparezcan en los datos, en orden
- * alfabético.
+ * Opciones del filtro: las sugerencias (siempre, aunque aún no tengan
+ * movimientos) y aparte los demás conceptos que aparezcan en los datos, en
+ * orden alfabético.
  */
-export function opcionesDeConcepto(movimientos: Movimiento[]) {
-  const fijas = new Set(CONCEPTOS_FIJOS.map(claveConcepto))
+export function opcionesDeConcepto(
+  movimientos: Movimiento[],
+  sugerencias: string[] = CONCEPTOS_POR_DEFECTO
+) {
+  const sugeridas = new Set(sugerencias.map(claveConcepto))
   const otros = new Map<string, string>()
   for (const m of movimientos) {
     const clave = claveConcepto(m.concepto)
-    if (!fijas.has(clave) && !otros.has(clave)) {
-      otros.set(clave, homogenizarConcepto(m.concepto))
+    if (!sugeridas.has(clave) && !otros.has(clave)) {
+      otros.set(clave, homogenizarConcepto(m.concepto, sugerencias))
     }
   }
   return {
-    fijos: CONCEPTOS_FIJOS,
+    fijos: sugerencias,
     otros: [...otros.values()].sort((a, b) => a.localeCompare(b, "es-CO")),
   }
 }

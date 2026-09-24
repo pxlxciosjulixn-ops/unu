@@ -1,21 +1,25 @@
 """
-Conceptos fijos y cómo se homogenizan.
+Conceptos sugeridos y cómo se homogenizan.
 
-"mt15", "MT15 " y "Mt15" son el mismo concepto: si lo escrito coincide con uno
-de la lista (sin importar mayúsculas, tildes ni espacios de sobra), se guarda
-con el nombre de la lista. Así el dashboard y el asistente los suman juntos y
-el filtro por concepto trae todo el dinero de ese concepto.
+"mt15", "MT15 " y "Mt15" son el mismo concepto: si lo escrito coincide con una
+sugerencia guardada (sin importar mayúsculas, tildes ni espacios de sobra), se
+guarda con el nombre de la sugerencia. Así el dashboard y el asistente los
+suman juntos y el filtro por concepto trae todo el dinero de ese concepto.
 
-La misma lista vive en `frontend/src/components/finanzas/finanzas.ts`
-(`CONCEPTOS_FIJOS`) para las sugerencias del formulario. Si se cambia una, se
-cambia la otra; si no, la de aquí manda, porque es la que se guarda.
+Las sugerencias viven en la tabla `finanzas_sugerencia` y se administran desde
+la página de edición (`/editar/gastos/julian/palacios`). `CONCEPTOS_SEMILLA`
+es solo con lo que arrancó esa tabla en la migración 0004: de ahí en adelante
+manda la tabla, y esta lista únicamente sirve de respaldo si todavía no se ha
+migrado.
 """
 
 from __future__ import annotations
 
 import unicodedata
 
-CONCEPTOS_FIJOS = [
+from django.db import DatabaseError
+
+CONCEPTOS_SEMILLA = [
     "Mt15",
     "Nu",
     "Addi",
@@ -37,10 +41,31 @@ def clave(texto: str) -> str:
     return " ".join(sin_tildes.lower().split())
 
 
-_POR_CLAVE = {clave(nombre): nombre for nombre in CONCEPTOS_FIJOS}
+def mapa() -> dict[str, str]:
+    """
+    Clave → nombre de cada sugerencia guardada.
+
+    Es una consulta por llamada, así que quien homogenice varios conceptos
+    seguidos (el resumen del correo) lo pide una vez y lo pasa.
+    """
+    try:
+        from finanzas.models import Sugerencia
+
+        return {s.clave: s.nombre for s in Sugerencia.objects.only("clave", "nombre")}
+    except DatabaseError:
+        # La tabla todavía no existe: pasa dentro de las migraciones viejas,
+        # que corren antes de que la 0004 la cree.
+        return {clave(nombre): nombre for nombre in CONCEPTOS_SEMILLA}
 
 
-def homogenizar(texto: str) -> str:
-    """El nombre de la lista si coincide; si no, lo escrito sin espacios de sobra."""
+def nombre_sugerido(texto: str, sugerencias: dict[str, str] | None = None) -> str | None:
+    """El nombre de la sugerencia que coincide con lo escrito, o `None`."""
+    if sugerencias is None:
+        sugerencias = mapa()
+    return sugerencias.get(clave(texto))
+
+
+def homogenizar(texto: str, sugerencias: dict[str, str] | None = None) -> str:
+    """El nombre de la sugerencia si coincide; si no, lo escrito sin espacios de sobra."""
     limpio = " ".join(texto.split())
-    return _POR_CLAVE.get(clave(limpio), limpio)
+    return nombre_sugerido(limpio, sugerencias) or limpio

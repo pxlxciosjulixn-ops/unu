@@ -34,6 +34,9 @@ export async function fetchJson<T>(
     )
   }
 
+  // 204: borrar no devuelve cuerpo y `json()` reventaría con él vacío.
+  if (respuesta.status === 204) return undefined as T
+
   return (await respuesta.json()) as T
 }
 

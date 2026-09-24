@@ -51,6 +51,12 @@ const DashboardGastosPage = lazy(() =>
   }))
 )
 
+const EditarGastosPage = lazy(() =>
+  import("@/components/finanzas/editar-page").then((m) => ({
+    default: m.EditarGastosPage,
+  }))
+)
+
 const LoginPage = lazy(() =>
   import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
 )
@@ -135,6 +141,14 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <DashboardGastosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/editar/gastos/julian/palacios"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <EditarGastosPage />
               </Suspense>
             }
           />

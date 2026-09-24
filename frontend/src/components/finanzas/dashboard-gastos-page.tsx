@@ -27,6 +27,7 @@ import { GraficaDistribucion } from "@/components/finanzas/grafica-distribucion"
 import { GraficaEvolucion } from "@/components/finanzas/grafica-evolucion"
 import { TablaMovimientos } from "@/components/finanzas/tabla-movimientos"
 import { TarjetasResumen } from "@/components/finanzas/tarjetas-resumen"
+import { useSugerencias } from "@/components/finanzas/use-sugerencias"
 import {
   Alert,
   AlertAction,
@@ -46,12 +47,16 @@ import { useApi } from "@/hooks/use-api"
  */
 export function DashboardGastosPage() {
   const { data, error, cargando, recargar } = useApi<Movimiento[]>(RUTA_API)
+  const { nombres: sugerencias } = useSugerencias()
   const [periodo, setPeriodo] = React.useState<Periodo>("mes")
   const [concepto, setConcepto] = React.useState<string | null>(null)
 
   // Las opciones salen de todos los datos, no del periodo: un concepto sin
   // movimientos este mes sigue apareciendo en la lista.
-  const opciones = React.useMemo(() => opcionesDeConcepto(data ?? []), [data])
+  const opciones = React.useMemo(
+    () => opcionesDeConcepto(data ?? [], sugerencias),
+    [data, sugerencias]
+  )
 
   const calculos = React.useMemo(() => {
     if (!data) return null

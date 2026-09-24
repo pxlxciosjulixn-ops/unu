@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from django.db.models import Count, Sum
 from django.db.models.functions import Lower, Trim
 
-from finanzas.conceptos import CONCEPTOS_FIJOS, homogenizar
+from finanzas.conceptos import mapa as mapa_de_sugerencias, nombre_sugerido
 from finanzas.models import Movimiento
 
 MESES = [
@@ -83,10 +83,9 @@ def _del_mes(mes: date):
     return Movimiento.objects.filter(fecha__gte=inicio, fecha__lt=mes_siguiente(inicio))
 
 
-def _nombre(texto: str) -> str:
-    """El nombre de la lista si es un concepto fijo; si no, con mayúscula inicial."""
-    fijo = homogenizar(texto)
-    return fijo if fijo in CONCEPTOS_FIJOS else texto.capitalize()
+def _nombre(texto: str, sugerencias: dict[str, str]) -> str:
+    """El nombre de la sugerencia si coincide; si no, con mayúscula inicial."""
+    return nombre_sugerido(texto, sugerencias) or texto.capitalize()
 
 
 def resumen_mes(mes: date, top: int = 5) -> ResumenMes:
@@ -107,8 +106,14 @@ def resumen_mes(mes: date, top: int = 5) -> ResumenMes:
         .annotate(total=Sum("valor"), veces=Count("id"))
         .order_by("-total")[:top]
     )
+    # Las sugerencias se piden una sola vez para todos los grupos.
+    sugerencias = mapa_de_sugerencias()
     resumen.conceptos_gasto = [
-        Concepto(nombre=_nombre(g["clave"]), total=g["total"], veces=g["veces"])
+        Concepto(
+            nombre=_nombre(g["clave"], sugerencias),
+            total=g["total"],
+            veces=g["veces"],
+        )
         for g in grupos
     ]
     return resumen

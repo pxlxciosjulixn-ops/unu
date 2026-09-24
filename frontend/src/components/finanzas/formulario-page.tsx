@@ -4,7 +4,6 @@ import { Link } from "react-router-dom"
 
 import {
   CONCEPTO_MAX,
-  CONCEPTOS_FIJOS,
   crearMovimiento,
   escribirValor,
   formatearFechaLocal,
@@ -19,6 +18,7 @@ import {
   type Tipo,
 } from "@/components/finanzas/finanzas"
 import { FinanzasShell } from "@/components/finanzas/finanzas-shell"
+import { useSugerencias } from "@/components/finanzas/use-sugerencias"
 import {
   Alert,
   AlertAction,
@@ -80,6 +80,7 @@ import { formatearPesos } from "@/lib/format"
  * lo que se repite al anotar varios gastos del mismo día.
  */
 export function FormularioGastosPage() {
+  const { nombres: sugerencias } = useSugerencias()
   const [fecha, setFecha] = React.useState(hoyISO)
   const [tipo, setTipo] = React.useState<Tipo>("gasto")
   const [concepto, setConcepto] = React.useState("")
@@ -104,7 +105,12 @@ export function FormularioGastosPage() {
     setGuardado(null)
     // "mt15" se muestra y se guarda como "Mt15": lo que se ve en la vista
     // previa es lo mismo que va a quedar en el dashboard.
-    setPreview({ fecha, tipo, concepto: homogenizarConcepto(concepto), valor })
+    setPreview({
+      fecha,
+      tipo,
+      concepto: homogenizarConcepto(concepto, sugerencias),
+      valor,
+    })
   }
 
   async function confirmar() {
@@ -185,7 +191,7 @@ export function FormularioGastosPage() {
                       libre, pero si lo escrito es uno de la lista se guarda
                       con ese nombre. */}
                   <Autocomplete
-                    items={CONCEPTOS_FIJOS}
+                    items={sugerencias}
                     value={concepto}
                     onValueChange={(texto) =>
                       setConcepto(texto.slice(0, CONCEPTO_MAX))

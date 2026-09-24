@@ -6,8 +6,10 @@ import {
   ChartPieIcon,
   GaugeIcon,
   LayoutDashboardIcon,
+  LightbulbIcon,
   ListIcon,
   NotebookPenIcon,
+  PencilLineIcon,
   SquarePlusIcon,
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
@@ -39,24 +41,35 @@ const PAGINAS: Pagina[] = [
     to: RUTAS_FINANZAS.formulario,
     icon: SquarePlusIcon,
   },
+  {
+    titulo: "Editar movimientos",
+    to: RUTAS_FINANZAS.editar,
+    icon: PencilLineIcon,
+  },
 ]
 
 type Ancla = { titulo: string; hash: string; icon: LucideIcon }
 
-/** Bloques del dashboard: el enlace baja hasta cada uno. */
-const SECCIONES: Ancla[] = [
-  { titulo: "Resumen", hash: "#resumen", icon: GaugeIcon },
-  { titulo: "Evolución", hash: "#evolucion", icon: ChartLineIcon },
-  { titulo: "Ingresos vs. gastos", hash: "#balance", icon: ChartPieIcon },
-  { titulo: "Asistente IA", hash: "#asistente", icon: BotIcon },
-  { titulo: "Por concepto", hash: "#conceptos", icon: ChartBarBigIcon },
-  { titulo: "Datos del periodo", hash: "#datos", icon: NotebookPenIcon },
-  { titulo: "Movimientos", hash: "#movimientos", icon: ListIcon },
-]
+/** Bloques de cada página: el enlace baja hasta cada uno. */
+const SECCIONES: Record<string, Ancla[]> = {
+  [RUTAS_FINANZAS.dashboard]: [
+    { titulo: "Resumen", hash: "#resumen", icon: GaugeIcon },
+    { titulo: "Evolución", hash: "#evolucion", icon: ChartLineIcon },
+    { titulo: "Ingresos vs. gastos", hash: "#balance", icon: ChartPieIcon },
+    { titulo: "Asistente IA", hash: "#asistente", icon: BotIcon },
+    { titulo: "Por concepto", hash: "#conceptos", icon: ChartBarBigIcon },
+    { titulo: "Datos del periodo", hash: "#datos", icon: NotebookPenIcon },
+    { titulo: "Movimientos", hash: "#movimientos", icon: ListIcon },
+  ],
+  [RUTAS_FINANZAS.editar]: [
+    { titulo: "Movimientos", hash: "#movimientos", icon: ListIcon },
+    { titulo: "Sugerencias", hash: "#sugerencias", icon: LightbulbIcon },
+  ],
+}
 
 function FinanzasSidebar() {
   const { pathname } = useLocation()
-  const enDashboard = pathname === RUTAS_FINANZAS.dashboard
+  const secciones = SECCIONES[pathname]
 
   return (
     <Sidebar collapsible="icon">
@@ -103,11 +116,11 @@ function FinanzasSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {enDashboard ? (
+        {secciones ? (
           <SidebarGroup>
             <SidebarGroupLabel>En esta página</SidebarGroupLabel>
             <SidebarMenu>
-              {SECCIONES.map((seccion) => (
+              {secciones.map((seccion) => (
                 <SidebarMenuItem key={seccion.hash}>
                   <SidebarMenuButton
                     tooltip={seccion.titulo}
@@ -129,9 +142,9 @@ function FinanzasSidebar() {
 }
 
 /**
- * Armazón de las páginas de finanzas: el dashboard y el formulario se
- * enlazan entre sí desde la barra lateral, pero nada del resto del sitio
- * apunta hacia aquí.
+ * Armazón de las páginas de finanzas: el dashboard, el formulario y la página
+ * de edición se enlazan entre sí desde la barra lateral, pero nada del resto
+ * del sitio apunta hacia aquí.
  */
 export function FinanzasShell({
   titulo,
