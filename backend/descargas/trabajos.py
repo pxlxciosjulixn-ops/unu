@@ -107,12 +107,19 @@ def id_video(url: str) -> str | None:
 
 def mensaje_de_error(exc: Exception) -> str:
     texto = str(exc)
+    # El motivo real queda en los logs de Render; al usuario va uno corto.
+    log.warning("yt-dlp: %s", texto[:1000])
     if "Private video" in texto:
         return "El video es privado."
     if "confirm your age" in texto:
         return "El video tiene restricción de edad y no se puede bajar."
-    if "not a bot" in texto:
-        return "YouTube bloqueó al servidor por un rato. Intenta más tarde."
+    # En servidores en la nube YouTube pide iniciar sesión para "confirmar que
+    # no eres un bot" o responde 403: bloquea la IP del servidor, no el video.
+    if "Sign in" in texto or "not a bot" in texto or "HTTP Error 403" in texto:
+        return (
+            "YouTube bloqueó al servidor (pasa con las IPs de la nube). "
+            "El video está bien: desde la versión local sí baja."
+        )
     if "Video unavailable" in texto or "not available" in texto:
         return "El video no está disponible."
     return "YouTube no dejó leer ese video. Revisa la URL e intenta de nuevo."
