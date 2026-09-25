@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useLocation } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -12,6 +13,9 @@ import {
 } from "@/components/ui/dialog"
 
 const CLAVE = "unu.aviso-primera-carga"
+
+// Páginas que no le piden nada al servidor: ahí el aviso sobra.
+const SIN_AVISO = ["/min-2026/angel"]
 
 /** Cualquier acceso al almacenamiento falla en modo privado o con cookies bloqueadas. */
 function yaLoVio(): boolean {
@@ -44,11 +48,14 @@ function recordar() {
 export function AvisoPrimeraCarga() {
   // El almacenamiento se lee una sola vez, al montar: después manda el estado.
   const [abierto, setAbierto] = React.useState(() => !yaLoVio())
+  const { pathname } = useLocation()
 
   function cerrar(sigueAbierto: boolean) {
     setAbierto(sigueAbierto)
     if (!sigueAbierto) recordar()
   }
+
+  if (SIN_AVISO.includes(pathname.replace(/\/+$/, ""))) return null
 
   return (
     <Dialog open={abierto} onOpenChange={cerrar}>

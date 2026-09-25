@@ -3,9 +3,9 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
-/* La app es siempre clara: se deja el variant atado a la clase `.dark` (que
-   nunca se aplica) para que las clases `dark:` de los componentes de shadcn no
-   se activen por la preferencia del sistema. */
+/* La app es clara: el variant va atado a la clase `.dark` y no a la
+   preferencia del sistema. Solo el chat la pone, si el visitante elige el
+   tema oscuro en sus ajustes; la hoja de vida se queda siempre clara. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -93,6 +93,328 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
+
+/* Tema oscuro del chat (ver `personalizacion.tsx`): la misma escala de grises,
+   de oscuro a claro. */
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.185 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.7 0 0);
+  --chart-3: oklch(0.56 0 0);
+  --chart-4: oklch(0.42 0 0);
+  --chart-5: oklch(0.3 0 0);
+  --sidebar: oklch(0.185 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Estilo vintage del chat (ver `personalizacion.ts`): papel crema, tinta
+   café, esquinas menos redondas y sombras de imprenta. El color de acento y
+   la letra que elija el visitante van encima. */
+.vintage {
+  --background: oklch(0.955 0.025 85);
+  --foreground: oklch(0.29 0.04 55);
+  --card: oklch(0.975 0.02 85);
+  --card-foreground: oklch(0.29 0.04 55);
+  --popover: oklch(0.975 0.02 85);
+  --popover-foreground: oklch(0.29 0.04 55);
+  --primary: oklch(0.43 0.09 38);
+  --primary-foreground: oklch(0.97 0.02 85);
+  --secondary: oklch(0.92 0.03 80);
+  --secondary-foreground: oklch(0.29 0.04 55);
+  --muted: oklch(0.925 0.03 82);
+  --muted-foreground: oklch(0.5 0.045 60);
+  --accent: oklch(0.915 0.035 80);
+  --accent-foreground: oklch(0.29 0.04 55);
+  --border: oklch(0.8 0.045 75);
+  --input: oklch(0.8 0.045 75);
+  --ring: oklch(0.55 0.07 50);
+  --chart-1: oklch(0.43 0.09 38);
+  --chart-2: oklch(0.52 0.07 50);
+  --chart-3: oklch(0.62 0.06 65);
+  --chart-4: oklch(0.72 0.05 75);
+  --chart-5: oklch(0.82 0.04 80);
+  --radius: 0.3rem;
+  --sidebar: oklch(0.925 0.035 82);
+  --sidebar-foreground: oklch(0.29 0.04 55);
+  --sidebar-primary: oklch(0.43 0.09 38);
+  --sidebar-primary-foreground: oklch(0.97 0.02 85);
+  --sidebar-accent: oklch(0.9 0.04 80);
+  --sidebar-accent-foreground: oklch(0.29 0.04 55);
+  --sidebar-border: oklch(0.8 0.045 75);
+  --sidebar-ring: oklch(0.55 0.07 50);
+}
+
+.dark.vintage {
+  --background: oklch(0.21 0.02 55);
+  --foreground: oklch(0.9 0.035 85);
+  --card: oklch(0.25 0.025 55);
+  --card-foreground: oklch(0.9 0.035 85);
+  --popover: oklch(0.27 0.025 55);
+  --popover-foreground: oklch(0.9 0.035 85);
+  --primary: oklch(0.78 0.08 70);
+  --primary-foreground: oklch(0.21 0.02 55);
+  --secondary: oklch(0.3 0.025 55);
+  --secondary-foreground: oklch(0.9 0.035 85);
+  --muted: oklch(0.3 0.025 55);
+  --muted-foreground: oklch(0.72 0.04 75);
+  --accent: oklch(0.32 0.03 55);
+  --accent-foreground: oklch(0.9 0.035 85);
+  --border: oklch(0.4 0.03 60);
+  --input: oklch(0.4 0.03 60);
+  --ring: oklch(0.6 0.06 65);
+  --chart-1: oklch(0.78 0.08 70);
+  --chart-3: oklch(0.6 0.05 60);
+  --sidebar: oklch(0.19 0.02 55);
+  --sidebar-foreground: oklch(0.9 0.035 85);
+  --sidebar-primary: oklch(0.78 0.08 70);
+  --sidebar-primary-foreground: oklch(0.21 0.02 55);
+  --sidebar-accent: oklch(0.3 0.025 55);
+  --sidebar-accent-foreground: oklch(0.9 0.035 85);
+  --sidebar-border: oklch(0.4 0.03 60);
+}
+
+/* Grano de papel muy suave detrás de todo. */
+.vintage body,
+.vintage [data-slot="sidebar-inset"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/* Fotos en sepia y sombras de imprenta (desplazadas, sin difuminar). */
+.vintage img {
+  filter: sepia(0.45) contrast(0.95);
+}
+
+.vintage .shadow-xs,
+.vintage .shadow-sm,
+.vintage .shadow-md,
+.vintage .shadow-lg {
+  box-shadow: 3px 3px 0 0
+    color-mix(in oklch, var(--foreground) 16%, transparent);
+}
+
+/* Estilo Web 1.0 / Y2K del chat: escritorio rosado pixelado, ventanas gris
+   plata con biseles de Windows 98, campos hundidos y títulos en cursiva. El
+   color de acento y la letra que elija el visitante van encima. */
+.y2k {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0 0 0);
+    --card: oklch(0.8 0 0);
+    --card-foreground: oklch(0 0 0);
+    --popover: oklch(0.8 0 0);
+    --popover-foreground: oklch(0 0 0);
+    --primary: oklch(0.27 0.18 265);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.86 0 0);
+    --secondary-foreground: oklch(0 0 0);
+    --muted: oklch(0.87 0.005 90);
+    --muted-foreground: oklch(0.32 0 0);
+    --accent: oklch(0.27 0.18 265);
+    --accent-foreground: oklch(1 0 0);
+    --border: oklch(0.58 0 0);
+    --input: oklch(0.58 0 0);
+    --ring: oklch(0.27 0.18 265);
+    --chart-1: oklch(0.27 0.18 265);
+    --chart-2: oklch(0.45 0.2 265);
+    --chart-3: oklch(0.65 0.28 340);
+    --chart-4: oklch(0.75 0.2 340);
+    --chart-5: oklch(0.85 0.12 340);
+    --radius: 0rem;
+    --sidebar: oklch(0.8 0 0);
+    --sidebar-foreground: oklch(0 0 0);
+    --sidebar-primary: oklch(0.27 0.18 265);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.27 0.18 265);
+    --sidebar-accent-foreground: oklch(1 0 0);
+    --sidebar-border: oklch(0.58 0 0);
+    --sidebar-ring: oklch(0.27 0.18 265);
+}
+
+.dark.y2k {
+    --background: oklch(0.22 0.03 300);
+    --foreground: oklch(0.97 0 0);
+    --card: oklch(0.35 0.01 300);
+    --card-foreground: oklch(0.97 0 0);
+    --popover: oklch(0.35 0.01 300);
+    --popover-foreground: oklch(0.97 0 0);
+    --primary: oklch(0.72 0.25 340);
+    --primary-foreground: oklch(0.15 0 0);
+    --muted: oklch(0.3 0.02 300);
+    --muted-foreground: oklch(0.8 0.02 300);
+    --secondary: oklch(0.3 0.02 300);
+    --secondary-foreground: oklch(0.97 0 0);
+    --border: oklch(0.5 0.02 300);
+    --input: oklch(0.5 0.02 300);
+    --chart-1: oklch(0.72 0.25 340);
+    --chart-3: oklch(0.7 0.15 230);
+    --sidebar: oklch(0.3 0.01 300);
+    --sidebar-foreground: oklch(0.97 0 0);
+}
+
+/* El escritorio: cuadritos rosados como un fondo de pantalla de los 90. */
+.y2k body,
+.y2k [data-slot="sidebar-inset"] {
+    background-color: #f7b2ea;
+    background-image: repeating-conic-gradient(#f59ce3 0% 25%, #fbc9f1 0% 50%);
+    background-size: 8px 8px;
+}
+
+.dark.y2k body,
+.dark.y2k [data-slot="sidebar-inset"] {
+    background-color: #2a1238;
+    background-image: repeating-conic-gradient(#33164a 0% 25%, #25102f 0% 50%);
+}
+
+/* Ventanas: gris plata con bisel en relieve (luz arriba a la izquierda). */
+.y2k .bg-card,
+.y2k .bg-popover,
+.y2k [data-slot="dialog-content"] {
+    border-color: transparent !important;
+    box-shadow:
+        inset -1px -1px #0a0a0a,
+        inset 1px 1px #ffffff,
+        inset -2px -2px #808080,
+        inset 2px 2px #dfdfdf !important;
+}
+
+/* Botones en relieve, y hundidos al apretarlos. */
+.y2k [data-slot="button"] {
+    box-shadow:
+        inset -1px -1px #0a0a0a,
+        inset 1px 1px #ffffff,
+        inset -2px -2px #808080,
+        inset 2px 2px #dfdfdf;
+}
+
+.y2k [data-slot="button"]:active {
+    box-shadow:
+        inset 1px 1px #0a0a0a,
+        inset -1px -1px #ffffff,
+        inset 2px 2px #808080,
+        inset -2px -2px #dfdfdf;
+}
+
+/* Campos de texto hundidos y blancos. */
+.y2k [data-slot="input-group"],
+.y2k [data-slot="input"],
+.y2k [data-slot="select-trigger"],
+.y2k input[type="date"] {
+    border-radius: 0 !important;
+    background-color: #ffffff;
+    border-color: transparent !important;
+    box-shadow:
+        inset -1px -1px #ffffff,
+        inset 1px 1px #808080,
+        inset -2px -2px #dfdfdf,
+        inset 2px 2px #0a0a0a !important;
+}
+
+/* En la conversación activa (fondo azul marino) el texto gris no se lee. */
+.y2k [data-sidebar="menu-button"][data-active] .text-muted-foreground {
+    color: #c8c8ff;
+}
+
+/* Títulos como "Welcome to the nostalgia": cursiva rosada con sombra. */
+.y2k h1 {
+    font-family: "Times New Roman", Times, serif;
+    font-style: italic;
+    font-weight: 400;
+    color: #e0198f;
+    text-shadow: 2px 2px 0 #ffffff;
+}
+
+.dark.y2k h1 {
+    color: #ff7ad9;
+    text-shadow: 2px 2px 0 #000000;
+}
+
+/* Entrada escalonada del chat: los hijos de `.aparecer` llegan uno tras
+   otro con un leve desvanecido. Nada se mueve si el sistema pide reducir
+   movimiento. */
+@keyframes aparecer {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .aparecer > * {
+        animation: aparecer 0.45s ease-out both;
+    }
+    .aparecer > *:nth-child(2) {
+        animation-delay: 45ms;
+    }
+    .aparecer > *:nth-child(3) {
+        animation-delay: 90ms;
+    }
+    .aparecer > *:nth-child(4) {
+        animation-delay: 135ms;
+    }
+    .aparecer > *:nth-child(5) {
+        animation-delay: 180ms;
+    }
+    .aparecer > *:nth-child(6) {
+        animation-delay: 225ms;
+    }
+    .aparecer > *:nth-child(7) {
+        animation-delay: 270ms;
+    }
+    .aparecer > *:nth-child(8) {
+        animation-delay: 315ms;
+    }
+    .aparecer > *:nth-child(9) {
+        animation-delay: 360ms;
+    }
+    .aparecer > *:nth-child(10) {
+        animation-delay: 405ms;
+    }
+    .aparecer > *:nth-child(11) {
+        animation-delay: 450ms;
+    }
+    .aparecer > *:nth-child(12) {
+        animation-delay: 495ms;
+    }
+    .aparecer > *:nth-child(13) {
+        animation-delay: 540ms;
+    }
+    .aparecer > *:nth-child(14) {
+        animation-delay: 585ms;
+    }
+    .aparecer > *:nth-child(15) {
+        animation-delay: 630ms;
+    }
+    .aparecer > *:nth-child(16) {
+        animation-delay: 675ms;
+    }
+}
 
 @layer base {
   * {

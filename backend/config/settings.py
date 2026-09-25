@@ -187,6 +187,8 @@ REST_FRAMEWORK = {
         "chat": "20/min",
         "login": "10/min",
         "finanzas": "30/min",
+        # Consulta y subida de chats de WhatsApp para el consejero.
+        "analisis": "30/min",
     },
 }
 
@@ -274,6 +276,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # El chat habla con una API compatible con la de OpenAI, asi que cambiar de
 # proveedor es cambiar `CHAT_PROVIDER`: "openai" o "nvidia".
 CHAT_PROVIDER = os.getenv("CHAT_PROVIDER", "openai").strip().lower()
+
+# Clave para cambiar el largo de las respuestas del consejero desde la rueda
+# de /chatbot. En produccion conviene ponerla en el entorno de Render.
+CONSEJERO_CLAVE_AJUSTES = os.getenv("CONSEJERO_CLAVE_AJUSTES", "Pass-2023")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")

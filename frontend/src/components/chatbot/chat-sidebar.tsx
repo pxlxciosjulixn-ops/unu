@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { Link } from "react-router-dom"
 
+import { BotonInstalar } from "@/components/chatbot/boton-instalar"
 import { SidebarMarca } from "@/components/sidebar-marca"
 import type { Conversacion } from "@/components/chatbot/tipos"
 import { Button } from "@/components/ui/button"
@@ -61,7 +62,7 @@ export function ChatSidebar({
 }) {
   return (
     <Sidebar collapsible="icon">
-      <SidebarMarca seccion="Chatbot" />
+      <SidebarMarca seccion="Chatbot" foto="/img/chatbot-avatar.png" />
 
       <SidebarContent>
         <SidebarGroup>
@@ -135,6 +136,7 @@ export function ChatSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
+          <BotonInstalar />
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Ir al dashboard"
@@ -148,6 +150,10 @@ export function ChatSidebar({
         <p className="px-2 pb-1 text-[0.6875rem] leading-snug text-muted-foreground group-data-[collapsible=icon]:hidden">
           Las conversaciones se guardan en la base y se agrupan por tu conexión,
           sin inicio de sesión.
+        </p>
+        <p className="px-2 pb-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+          Desarrollado por{" "}
+          <span className="font-semibold text-foreground">Julian Palacios</span>
         </p>
       </SidebarFooter>
     </Sidebar>

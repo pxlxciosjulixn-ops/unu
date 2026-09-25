@@ -21,7 +21,15 @@ import httpx
 from django.conf import settings
 from django.db.models import F
 
-from chat.models import ChatQuota, Conversation, Message
+from chat import estadisticas
+from chat import perfil as perfil_chat
+from chat.models import (
+    AjustesConsejero,
+    ChatQuota,
+    Conversation,
+    Message,
+    PreferenciaVisitante,
+)
 from finanzas.contexto import finanzas_como_texto
 from resume.contexto import hoja_de_vida_como_texto
 
@@ -98,6 +106,295 @@ SIN_FINANZAS = (
 )
 
 
+# Lo que responde el chat cuando le preguntan algo que no es un chat de
+# WhatsApp cargado. Sin archivo se manda tal cual, sin llamar al modelo.
+RESPUESTA_FUERA_DE_TEMA = (
+    "Sapa hijueputa, este chat fue creado por Julian para leer y dar consejos "
+    "sobre conversaciones, no para sus maricadas."
+)
+# La misma idea para quien eligio el nivel suave, que no lleva groserias.
+RESPUESTA_FUERA_DE_TEMA_SUAVE = (
+    "Este chat fue creado por Julian para leer y dar consejos sobre "
+    "conversaciones. Sube un chat de WhatsApp y te ayudo con eso."
+)
+
+GROSERIAS = (
+    '"pirobo", "sapa hp", "sapa hijueputa", "gonorrea", "malparido" o '
+    '"malparida", "perra", "idiota", "imbécil", "mísero" o "mísera"'
+)
+
+# Las de "sin filtro": las de siempre y las que pidió Julian. Van escritas en
+# masculino; se ajustan al género de a quién se le dicen.
+GROSERIAS_SIN_FILTRO = GROSERIAS + (
+    ', "pirobo irrespetuoso", "qué pirobo tan imbécil", "qué pirobo tan '
+    'marica", "pirobo rogándole a una vieja" (para quien le ruega a alguien), '
+    '"becerro hijueputa", "setenta hijueputa", "hijo de la grandísima perra", '
+    '"cacorro", "zunga", "zorra", "moje cuco loca hijueputa", "qué visaje" '
+    '(cuando algo está raro o sospechoso) y "qué boleta" (cuando algo da pena '
+    'ajena)'
+)
+
+_USTED = (
+    'A quien te escribe lo tratas de usted, nunca de tú: "mire", "usted", '
+    '"le", "su", "haga", "pregúntele", "no sea". Nada de "mira", "tú", "te", '
+    '"tu", "haz" ni "pregúntale".'
+)
+
+# Como habla el consejero segun el nivel que eligio el visitante en ajustes.
+# `minimo` es cuantas groserias se le exige revisar antes de terminar.
+NIVELES_DE_GROSERIA = {
+    "suave": {
+        "minimo": 0,
+        "trato": (
+            "A quien te escribe lo tratas de tú, con calidez: atento, amable y "
+            "paciente, como un buen amigo que se preocupa. Pero habla normal: "
+            'nada de apodos cariñosos ("amor", "cariño", "corazón", "linda", '
+            '"bebé", "mi vida") ni diminutivos empalagosos.'
+        ),
+        "regla": "No dices ninguna grosería, ni suave.",
+        "ejemplo": (
+            "Mira, ella te responde, pero corto y sin hacerte preguntas: eso "
+            "es un interés tibio. Tú le escribes el doble y eso puede sonar a "
+            "que estás ansioso. Dale un toque más personal y pregúntale cosas "
+            "que la hagan abrirse más; si no cambia, no te desgastes."
+        ),
+        "fuera_de_tema": RESPUESTA_FUERA_DE_TEMA_SUAVE,
+        "verificacion": "que no tenga ninguna grosería",
+    },
+    "normal": {
+        "minimo": 1,
+        "trato": _USTED,
+        "regla": (
+            "Eres algo grosero, sin exagerar: una o dos groserías por "
+            f"respuesta, y solo de estas: {GROSERIAS}. El resto del texto va "
+            "serio."
+        ),
+        "ejemplo": (
+            "Mire, ella le responde, pero corto y sin hacerle preguntas: eso "
+            "es interés tibio. Usted le escribe el doble, pirobo, y así "
+            "parece desesperado. Dele un toque más personal y pregúntele cosas "
+            "que la hagan abrirse más."
+        ),
+        "fuera_de_tema": RESPUESTA_FUERA_DE_TEMA,
+        "verificacion": "que tenga al menos una grosería de la lista (y máximo dos)",
+    },
+    "sin_filtro": {
+        "minimo": 6,
+        "trato": _USTED,
+        "regla": (
+            "No tienes filtro: eres super grosero, casi cada frase lleva una "
+            f"grosería, seis o más por respuesta, y solo de estas: "
+            f"{GROSERIAS_SIN_FILTRO}. Varíalas y no repitas la misma dos veces "
+            "seguidas. Estas sí se permiten aunque sean colombianas. Ajusta el "
+            "género: a una mujer se le dice piroba, malparida, becerra, hija de "
+            "la grandísima perra; a un hombre, pirobo, malparido, becerro. Por "
+            "grosero que seas, el consejo tiene que ser bueno, concreto y "
+            "servir para solucionar: la grosería es la forma, no el fondo."
+        ),
+        "ejemplo": (
+            "Qué visaje, pirobo: esa sapa hp le responde corto y sin hacerle "
+            "preguntas, gonorrea, y eso es interés tibio. Usted le escribe el "
+            "doble, qué pirobo tan imbécil, y rogándole a una vieja así da "
+            "boleta. Malparido, haga esto: deje de escribirle dos días y "
+            "cuando vuelva, pregúntele algo de lo que ella sí habla, como su "
+            "trabajo. Si sigue igual de seca, setenta hijueputa, suéltela."
+        ),
+        "fuera_de_tema": RESPUESTA_FUERA_DE_TEMA,
+        "verificacion": "que tenga al menos seis groserías de la lista",
+    },
+}
+
+NIVEL_POR_DEFECTO = "sin_filtro"
+
+
+def nivel_de_groseria(groseria: str) -> dict:
+    return NIVELES_DE_GROSERIA.get(groseria, NIVELES_DE_GROSERIA[NIVEL_POR_DEFECTO])
+
+
+# Quién da el consejo. Cambia la voz y el enfoque; el trato (tú o usted) y
+# las groserías siguen saliendo del nivel que eligió el visitante.
+PERSONALIDADES = {
+    "consejero": (
+        "Eres un consejero de relaciones directo: analizas el chat y vas al "
+        "grano con lo que conviene hacer."
+    ),
+    "amigo": (
+        "Eres su mejor amigo sincero: le hablas con confianza y cariño, le "
+        "dices la verdad aunque duela y lo apoyas. Usas ejemplos cotidianos, "
+        "como si estuvieran tomando algo."
+    ),
+    "psicologo": (
+        "Eres un psicólogo: calmado y sin juzgar. Hablas de emociones, "
+        "necesidades y patrones que se repiten en el chat, validas lo que "
+        "siente y terminas con una pregunta que lo haga reflexionar."
+    ),
+    "abuela": (
+        "Eres su abuela: sabia, directa y cariñosa a tu manera. Hablas con "
+        'dichos y refranes, cuentas cómo era "en mis tiempos" y le das '
+        "consejos de toda la vida. Lo llamas mijo o mija."
+    ),
+    "coach": (
+        "Eres un coach de conquista: estratégico y con mucha energía. Das "
+        "pasos concretos y numerados (qué escribir, cuándo, qué no hacer) y "
+        "motivas a pasar a la acción."
+    ),
+    "chismosa": (
+        "Eres su mejor amiga chismosa: reaccionas con drama y emoción "
+        '("¡NO LO PUEDO CREER!", "espera, espera"), analizas cada detalle del '
+        "chat como si fuera una novela y das tu opinión sin filtro."
+    ),
+}
+
+PERSONALIDAD_POR_DEFECTO = "consejero"
+
+
+def sistema_consejos(
+    groseria: str, max_caracteres: int, personalidad: str = PERSONALIDAD_POR_DEFECTO
+) -> str:
+    """
+    Instrucciones del consejero de relaciones. El chat de WhatsApp que eligio
+    el visitante (y sus estadisticas) se pega debajo, leido de la base.
+    """
+    nivel = nivel_de_groseria(groseria)
+    tutea = groseria == "suave"
+    quien = PERSONALIDADES.get(personalidad, PERSONALIDADES[PERSONALIDAD_POR_DEFECTO])
+    return f"""\
+{quien} Te especializas en relaciones (amor, conquista, pareja, amistad y
+familia) y te creó Julian Palacios. Abajo está un chat de WhatsApp exportado
+con sus estadísticas. Arriba del chat se indica cómo aparece en él quien te
+escribe y qué relación tiene con la otra persona: enfoca todos tus consejos en
+ese tipo de relación (no se aconseja igual a una pareja que a un amigo o a un
+familiar).
+
+Forma de hablar:
+- Mantén siempre tu personalidad, pero habla en español neutro y con
+  palabras sencillas. Nada de regionalismos ni jerga: no uses "parce",
+  "parcero", "a lo bien", "bacano", "qué más" ni nada con acento de un país,
+  salvo las groserías que se te permiten abajo.
+- {nivel['trato']}
+- {nivel['regla']}{'' if tutea else ' Concuerda el género con la persona. Pueden ir para quien te escribe o para la otra persona del chat, según venga al caso.'}
+- Ejemplo del tono: "{nivel['ejemplo']}"
+
+Reglas:
+1. Solo hablas del chat de abajo y de cómo le va a quien te escribe en esa
+   relación. Si te preguntan cualquier otra cosa (código, tareas, noticias,
+   recetas, lo que sea que no sea el chat), responde exactamente esto y nada
+   más: "{nivel['fuera_de_tema']}"
+2. Basa los consejos en lo que muestra el chat y en sus estadísticas: quién
+   escribe más, cuánto tarda cada uno en responder, quién inicia, el tono,
+   los temas. Cita cifras, mensajes cortos o fechas concretas como prueba.
+3. Sé honesto: si las señales son tibias o negativas, dilo sin endulzarlo.
+   No inventes lo que el chat no dice ni afirmes lo que la otra persona
+   siente: habla de señales.
+4. Da consejos prácticos: qué escribir, cuándo, qué evitar. Si te piden un
+   mensaje para mandar, redáctalo con el estilo de "Tú" en el chat (ahí sí
+   como él le habla a ella) y sin groserías, que ese es para la otra persona.
+5. Si te piden revisar un mensaje antes de mandarlo, responde así:
+   **Veredicto:** intenso, seco o bien (una sola palabra), luego en una o dos
+   frases por qué, comparándolo con cómo viene el chat, y al final
+   **Mejor así:** con una versión mejorada del mensaje, sin groserías y con
+   el estilo de "Tú". Si llevas groserías, van en el veredicto y la
+   explicación, nunca dentro del mensaje mejorado.
+6. Nada de manipulación, presión, celos ni control. Si ves señales de
+   maltrato o de riesgo, dilo en serio y sin groserías.
+7. Tu respuesta completa no puede pasar de {max_caracteres} caracteres,
+   contando espacios: ve directo a lo más importante. Markdown ligero
+   (negritas). Nada de saludos ni de repetir la pregunta.
+8. Obligatorio: antes de terminar, revisa {nivel['verificacion']}, que
+   {'tutee' if tutea else 'no tutee'} a quien te escribe y que no pase de
+   {max_caracteres} caracteres. Si falla algo de eso, está mal: corrígelo."""
+
+
+SIN_CONSEJOS = (
+    "Eres un consejero de relaciones grosero, pero el chat de WhatsApp que se "
+    "usaba como contexto en esta conversación ya fue borrado. Responde en "
+    "español neutro, sin regionalismos, en una línea y con una grosería "
+    "(gonorrea, pirobo, sapa hp, idiota) y tratando de usted, sin tutear, "
+    "que no tienes el chat y que suba el archivo de nuevo y abra una "
+    "conversación con él."
+)
+
+# Del chat se manda lo mas reciente: es lo que mas pesa para un consejo y asi
+# un historial de años no revienta el contexto del modelo ni la cuota.
+MAX_CARACTERES_CHAT_CONTEXTO = 40000
+
+
+def personalidad_de(visitante: str) -> str:
+    """La personalidad que eligio el visitante; el consejero si no eligio."""
+    return (
+        PreferenciaVisitante.objects.filter(visitor=visitante)
+        .values_list("personalidad", flat=True)
+        .first()
+        or PERSONALIDAD_POR_DEFECTO
+    )
+
+
+def groseria_de(visitante: str) -> str:
+    """El nivel de groserias que eligio el visitante; sin filtro si no eligio."""
+    return (
+        PreferenciaVisitante.objects.filter(visitor=visitante)
+        .values_list("groseria", flat=True)
+        .first()
+        or NIVEL_POR_DEFECTO
+    )
+
+
+def tokens_para(max_caracteres: int) -> int:
+    """
+    Tope de tokens para que quepa una respuesta de `max_caracteres`. En
+    español un token son unos 3,5 caracteres; se deja margen para que el tope
+    no corte la frase a la mitad (el largo real lo pone la instruccion).
+    """
+    return int(max_caracteres / 2.5) + 60
+
+
+# Lo que significa cada relacion para el consejero.
+_RELACIONES = {
+    "amistad": "amistad (es su amigo o amiga)",
+    "pareja": "pareja (ya son novios o pareja)",
+    "me_gusta": "le gusta esa persona y quiere conquistarla",
+    "amante": "amantes (una relación a escondidas o sin compromiso)",
+    "ex": "expareja",
+    "familia": "familiar",
+    "trabajo": "compañeros de trabajo o de estudio",
+    "otra": "otra",
+}
+
+
+def relacion_como_texto(analisis) -> str:
+    return _RELACIONES.get(analisis.relacion, "no la indicó; dedúcela del chat")
+
+
+def chat_como_contexto(analisis) -> str:
+    """El chat guardado, recortado a sus ultimas lineas si es muy largo."""
+    contenido = analisis.contenido
+    recortado = len(contenido) > MAX_CARACTERES_CHAT_CONTEXTO
+    if recortado:
+        contenido = contenido[-MAX_CARACTERES_CHAT_CONTEXTO:]
+        # Empieza en un mensaje completo, no a mitad de linea.
+        contenido = contenido[contenido.find("\n") + 1 :]
+
+    cabecera = [
+        f"Archivo: {analisis.nombre}",
+        f"Participantes: {', '.join(analisis.participantes)}",
+        f"Periodo: {analisis.desde} a {analisis.hasta}",
+        f"Mensajes: {analisis.total_mensajes}",
+        "",
+        f'Quien te escribe aparece en el chat como: "{analisis.yo}"',
+        f"Relación con la otra persona: {relacion_como_texto(analisis)}",
+        "Lo que contó sobre esa relación:",
+        perfil_chat.como_texto(analisis.perfil or {}, analisis.total_mensajes),
+        "",
+        "Estadísticas (calculadas del chat completo):",
+        estadisticas.como_texto(
+            estadisticas.calcular(analisis.contenido, analisis.yo, analisis.perfil)
+        ),
+    ]
+    if recortado:
+        cabecera.append("(Por su tamaño, abajo van solo los mensajes más recientes.)")
+    return "\n".join(cabecera) + "\n\n" + contenido
+
+
 def sistema_para(conversacion: Conversation) -> str:
     """
     Las instrucciones del modelo segun el alcance de la conversacion.
@@ -106,6 +403,19 @@ def sistema_para(conversacion: Conversation) -> str:
     base, para que el asistente responda con el CV recien editado sin tener
     que reiniciar nada.
     """
+    if conversacion.scope == Conversation.Scope.CONSEJOS:
+        # Oculto por el visitante cuenta como borrado: sigue en la base, pero
+        # el ya no lo quiere en sus conversaciones.
+        if conversacion.analisis is None or conversacion.analisis.borrado_en:
+            return SIN_CONSEJOS
+        chat = chat_como_contexto(conversacion.analisis)
+        instrucciones = sistema_consejos(
+            groseria_de(conversacion.visitor),
+            AjustesConsejero.actuales().max_caracteres,
+            personalidad_de(conversacion.visitor),
+        )
+        return f"{instrucciones}\n\n--- CHAT DE WHATSAPP ---\n{chat}"
+
     if conversacion.scope == Conversation.Scope.FINANZAS:
         datos = finanzas_como_texto()
         if datos is None:
@@ -144,10 +454,19 @@ MAX_TOKENS_FINANZAS = 180
 # Aquí importan los datos exactos, no la creatividad: temperatura baja.
 TEMPERATURA_FINANZAS = 0.2
 
+# El consejero manda el chat de WhatsApp entero como contexto en cada turno:
+# las preguntas pueden ser largas (a veces pegan un mensaje para revisar),
+# pero la charla de arrastre se corta antes.
+MAX_CARACTERES_CONSEJOS = 1500
+MAX_MENSAJES_CONSEJOS = 10
+# El largo de sus respuestas no es fijo: sale de `AjustesConsejero`, que se
+# cambia en la rueda de la pagina con la clave de ajustes.
+
 # Alcances con preguntas cortas: el tope de caracteres se valida en la vista.
 MAX_CARACTERES_POR_ALCANCE: dict[str, int] = {
     Conversation.Scope.RESUME: MAX_CARACTERES_RESUME,
     Conversation.Scope.FINANZAS: MAX_CARACTERES_FINANZAS,
+    Conversation.Scope.CONSEJOS: MAX_CARACTERES_CONSEJOS,
 }
 
 # Tope de salida del asistente general. Menos que los 4096 configurados: las
@@ -159,9 +478,12 @@ MAX_TOKENS_GENERAL = 600
 # sin tope. Se cuenta contra la tabla `ChatQuota`, que no se reinicia aunque
 # borre sus conversaciones.
 CUPO_POR_VISITANTE: dict[str, int | None] = {
-    Conversation.Scope.GENERAL: 5,
+    # Sin chat de WhatsApp, /chatbot responde una frase fija sin llamar al
+    # modelo: no gasta cuota, asi que no necesita tope.
+    Conversation.Scope.GENERAL: None,
     Conversation.Scope.RESUME: None,
     Conversation.Scope.FINANZAS: None,
+    Conversation.Scope.CONSEJOS: 30,
 }
 
 
@@ -195,6 +517,8 @@ def cupo_de(visitante: str, alcance: str) -> dict[str, int | None]:
     `limit` y `remaining` vienen en `None` cuando ese chat no tiene tope.
     """
     tope = CUPO_POR_VISITANTE.get(alcance)
+    if PreferenciaVisitante.objects.filter(visitor=visitante, sin_limite=True).exists():
+        tope = None
     gastados = (
         ChatQuota.objects.filter(visitor=visitante, scope=alcance)
         .values_list("used", flat=True)
@@ -210,7 +534,7 @@ def cupo_de(visitante: str, alcance: str) -> dict[str, int | None]:
 
 def gastar_del_cupo(visitante: str, alcance: str) -> None:
     """Suma un mensaje al contador del visitante."""
-    if CUPO_POR_VISITANTE.get(alcance) is None:
+    if cupo_de(visitante, alcance)["limit"] is None:
         return
 
     fila, creada = ChatQuota.objects.get_or_create(
@@ -234,6 +558,8 @@ def historial_para_modelo(conversacion: Conversation) -> list[dict[str, str]]:
         cuantos, tope = MAX_MENSAJES_RESUME, MAX_CARACTERES_RESUME
     elif conversacion.scope == Conversation.Scope.FINANZAS:
         cuantos, tope = MAX_MENSAJES_FINANZAS, MAX_CARACTERES_FINANZAS
+    elif conversacion.scope == Conversation.Scope.CONSEJOS:
+        cuantos, tope = MAX_MENSAJES_CONSEJOS, MAX_CARACTERES_CONSEJOS
     else:
         cuantos, tope = MAX_MENSAJES, MAX_CARACTERES_MENSAJE
 
@@ -352,6 +678,20 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
         provider=proveedor.nombre,
     )
 
+    if conversacion.scope == Conversation.Scope.GENERAL:
+        # /chatbot solo sirve con un chat de WhatsApp cargado: sin el, la
+        # respuesta es siempre la misma y no vale la pena pagarla al modelo.
+        frase = nivel_de_groseria(groseria_de(conversacion.visitor))["fuera_de_tema"]
+        guardado = Message.objects.create(
+            conversation=conversacion,
+            role=Message.Role.ASSISTANT,
+            content=frase,
+        )
+        conversacion.save(update_fields=["updated_at"])
+        yield _evento("delta", text=frase)
+        yield _evento("done", text=frase, message_id=guardado.id)
+        return
+
     if not proveedor.configurado:
         variable = "OPENAI_API_KEY" if proveedor.nombre == "openai" else "NVIDIA_API_KEY"
         yield _evento(
@@ -377,12 +717,16 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
             {
                 Conversation.Scope.RESUME: MAX_TOKENS_RESUME,
                 Conversation.Scope.FINANZAS: MAX_TOKENS_FINANZAS,
+                Conversation.Scope.CONSEJOS: tokens_para(
+                    AjustesConsejero.actuales().max_caracteres
+                ),
             }.get(conversacion.scope, MAX_TOKENS_GENERAL)
         ),
         **proveedor.extras(),
     }
 
     partes: list[str] = []
+    guardado = False
     razonando = False
     try:
         with httpx.Client(timeout=httpx.Timeout(300.0, connect=20.0)) as cliente:
@@ -445,7 +789,16 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
             yield _evento("error", message="El modelo no devolvió texto.")
             return
 
-        yield _evento("done", text="".join(partes))
+        # Se guarda antes de avisar: el id viaja en "done" y con él la página
+        # puede pedir el "¿te sirvió?" de esta respuesta.
+        mensaje = Message.objects.create(
+            conversation=conversacion,
+            role=Message.Role.ASSISTANT,
+            content="".join(partes).strip(),
+        )
+        conversacion.save(update_fields=["updated_at"])
+        guardado = True
+        yield _evento("done", text="".join(partes), message_id=mensaje.id)
 
     except httpx.TimeoutException:
         yield _evento(
@@ -458,7 +811,7 @@ def transmitir(conversacion: Conversation) -> Iterator[bytes]:
         # `finally` tambien corre si el visitante cierra la pestaña a mitad de
         # la respuesta: lo que llego queda guardado.
         texto = "".join(partes).strip()
-        if texto:
+        if texto and not guardado:
             Message.objects.create(
                 conversation=conversacion,
                 role=Message.Role.ASSISTANT,

@@ -25,6 +25,19 @@ const ChatbotPage = lazy(() =>
   }))
 )
 
+// Paginas sueltas del consejero: se abren desde /chatbot.
+const AjustesConsejeroPage = lazy(() =>
+  import("@/components/chatbot/ajustes-page").then((m) => ({
+    default: m.AjustesPage,
+  }))
+)
+
+const AnalisisChatPage = lazy(() =>
+  import("@/components/chatbot/analisis-page").then((m) => ({
+    default: m.AnalisisPage,
+  }))
+)
+
 const ProyectosPage = lazy(() =>
   import("@/components/proyectos/proyectos-page").then((m) => ({
     default: m.ProyectosPage,
@@ -207,6 +220,22 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <ChatbotPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/chatbot/ajustes"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <AjustesConsejeroPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/chatbot/chats/:id/analisis"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <AnalisisChatPage />
               </Suspense>
             }
           />
