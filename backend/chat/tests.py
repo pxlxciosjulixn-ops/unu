@@ -433,3 +433,79 @@ class OpinionesYSinLimiteTests(TestCase):
         self.assertTrue(self.mia.get("/api/chat/settings/").json()["unlimited"])
         # Solo esa conexión.
         self.assertFalse(self.otra.get("/api/chat/settings/").json()["unlimited"])
+
+
+@override_settings(
+    ALLOWED_HOSTS=["*"],
+    CONSEJERO_CLAVE_AJUSTES="clave-de-prueba",
+    CONSEJERO_CLAVE_MENSAJES="clave-mensajes",
+)
+class DesbloquearMensajesTests(TestCase):
+    """Un mensaje gratis; con la clave de mensajes se desbloquean de 10 a 30."""
+
+    def setUp(self):
+        self.mia = self.client_class(HTTP_X_FORWARDED_FOR="1.1.1.1")
+        self.otra = self.client_class(HTTP_X_FORWARDED_FOR="2.2.2.2")
+        self.visitante = services.hash_visitante("1.1.1.1")
+
+    def desbloquear(self, cantidad, clave="clave-mensajes", cliente=None):
+        return (cliente or self.mia).post(
+            "/api/chat/settings/messages/",
+            {"password": clave, "amount": cantidad},
+            content_type="application/json",
+        )
+
+    def restantes(self, cliente=None):
+        return (cliente or self.mia).get("/api/chat/settings/").json()["messages"]["remaining"]
+
+    def gastar(self, cuantos):
+        for _ in range(cuantos):
+            services.gastar_del_cupo(self.visitante, "consejos")
+
+    def test_sin_desbloquear_solo_hay_un_mensaje(self):
+        self.assertEqual(self.restantes(), 1)
+        self.gastar(1)
+        self.assertEqual(self.restantes(), 0)
+
+    def test_desbloquea_la_cantidad_elegida(self):
+        self.gastar(1)
+        r = self.desbloquear(15)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["messages"]["remaining"], 15)
+
+    def test_al_gastarlos_vuelve_a_desbloquear_y_tiene_esos(self):
+        self.gastar(1)
+        self.desbloquear(30)
+        self.gastar(30)
+        self.assertEqual(self.restantes(), 0)
+        self.desbloquear(15)
+        self.assertEqual(self.restantes(), 15)
+
+    def test_no_se_acumulan_repitiendo_la_clave(self):
+        # Quedan exactamente los elegidos, no la suma: si no, repetir la clave
+        # daria cientos de mensajes.
+        self.desbloquear(30)
+        self.desbloquear(30)
+        self.assertEqual(self.restantes(), 30)
+        self.gastar(5)
+        self.desbloquear(10)
+        self.assertEqual(self.restantes(), 10)
+
+    def test_fuera_de_rango_no_desbloquea(self):
+        self.assertEqual(self.desbloquear(9).status_code, 400)
+        self.assertEqual(self.desbloquear(31).status_code, 400)
+        self.assertEqual(self.desbloquear("muchos").status_code, 400)
+        self.assertEqual(self.restantes(), 1)
+
+    def test_otra_clave_no_sirve_ni_la_de_ajustes(self):
+        self.assertEqual(self.desbloquear(20, clave="mala").status_code, 403)
+        self.assertEqual(self.desbloquear(20, clave="clave-de-prueba").status_code, 403)
+        self.assertEqual(self.restantes(), 1)
+
+    @override_settings(CONSEJERO_CLAVE_MENSAJES="")
+    def test_sin_clave_configurada_nadie_desbloquea(self):
+        self.assertEqual(self.desbloquear(20, clave="").status_code, 403)
+
+    def test_solo_para_esa_conexion(self):
+        self.desbloquear(20)
+        self.assertEqual(self.restantes(self.otra), 1)

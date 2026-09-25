@@ -43,6 +43,11 @@ urlpatterns = [
     ),
     path("settings/feedback/", views.feedback_stats, name="feedback-stats"),
     path(
+        "settings/messages/",
+        views.chat_settings_messages,
+        name="settings-messages",
+    ),
+    path(
         "messages/<int:message_id>/feedback/",
         views.message_feedback,
         name="message-feedback",

@@ -218,6 +218,9 @@ class ChatQuota(models.Model):
     visitor = models.CharField("visitante", max_length=64, help_text="Hash de la IP")
     scope = models.CharField("alcance", max_length=16, choices=Conversation.Scope.choices)
     used = models.PositiveIntegerField("mensajes gastados", default=0)
+    # Mensajes que se le sumaron al tope con la clave de mensajes. El tope real
+    # es el base del alcance mas esto (ver `services.cupo_de`).
+    extra = models.PositiveIntegerField("mensajes desbloqueados", default=0)
     updated_at = models.DateTimeField("ultimo mensaje", auto_now=True)
 
     class Meta:

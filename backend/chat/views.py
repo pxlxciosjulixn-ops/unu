@@ -316,11 +316,16 @@ def _ajustes_como_dict(visitante: str) -> dict:
         "max_chars": AjustesConsejero.actuales().max_caracteres,
         "min_chars": AjustesConsejero.MIN_CARACTERES,
         "max_chars_limit": AjustesConsejero.MAX_CARACTERES,
+        # Cupo del consejero y cuantos se pueden desbloquear de una vez.
+        "messages": services.cupo_de(visitante, Conversation.Scope.CONSEJOS),
+        "unlock_min": services.MIN_MENSAJES_DESBLOQUEO,
+        "unlock_max": services.MAX_MENSAJES_DESBLOQUEO,
     }
 
 
-def _clave_valida(clave: object) -> bool:
-    esperada = settings.CONSEJERO_CLAVE_AJUSTES
+def _clave_valida(clave: object, esperada: str | None = None) -> bool:
+    if esperada is None:
+        esperada = settings.CONSEJERO_CLAVE_AJUSTES
     # `compare_digest` tarda lo mismo acierte o no: no deja adivinarla por
     # cuanto demora la respuesta.
     return bool(esperada) and hmac.compare_digest(
@@ -412,6 +417,38 @@ def chat_settings_unlimited(request: Request) -> Response:
         visitor=visitante,
         defaults={"sin_limite": bool(request.data.get("enabled"))},
     )
+    return Response(_ajustes_como_dict(visitante))
+
+
+@api_view(["POST"])
+@throttle_classes([ClaveAjustesThrottle])
+def chat_settings_messages(request: Request) -> Response:
+    """
+    Desbloquea mensajes del consejero para esta conexion con la clave de
+    mensajes: `{"password": ..., "amount": 10..30}`. Deja exactamente esa
+    cantidad por delante (ver `services.desbloquear_mensajes`).
+
+    La clave vive solo aqui, en el entorno del servidor: el navegador nunca la
+    conoce, solo la manda para que se compare.
+    """
+    if not _clave_valida(
+        request.data.get("password"), settings.CONSEJERO_CLAVE_MENSAJES
+    ):
+        return Response(
+            {"detail": "Contraseña incorrecta."}, status=status.HTTP_403_FORBIDDEN
+        )
+    try:
+        cantidad = int(request.data.get("amount"))
+    except (TypeError, ValueError):
+        cantidad = 0
+    minimo, maximo = services.MIN_MENSAJES_DESBLOQUEO, services.MAX_MENSAJES_DESBLOQUEO
+    if not minimo <= cantidad <= maximo:
+        return Response(
+            {"detail": f"Elige entre {minimo} y {maximo} mensajes."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    visitante = _visitante(request)
+    services.desbloquear_mensajes(visitante, Conversation.Scope.CONSEJOS, cantidad)
     return Response(_ajustes_como_dict(visitante))
 
 
@@ -735,7 +772,10 @@ def send(request: Request) -> StreamingHttpResponse | Response:
         return Response(
             {
                 "detail": (
-                    f"Llegaste al límite de {cupo['limit']} mensajes de esta "
+                    "Te quedaste sin mensajes. Si tienes la contraseña, "
+                    "desbloquea más en Ajustes."
+                    if conversacion.scope == Conversation.Scope.CONSEJOS
+                    else f"Llegaste al límite de {cupo['limit']} mensajes de esta "
                     "demostración. Escríbeme por correo si quieres ver más."
                 ),
                 "quota": cupo,

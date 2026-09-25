@@ -281,6 +281,11 @@ CHAT_PROVIDER = os.getenv("CHAT_PROVIDER", "openai").strip().lower()
 # de /chatbot. En produccion conviene ponerla en el entorno de Render.
 CONSEJERO_CLAVE_AJUSTES = os.getenv("CONSEJERO_CLAVE_AJUSTES", "Pass-2023")
 
+# Clave para desbloquear mas mensajes del consejero desde Ajustes. Distinta de
+# la de ajustes: esta se le puede pasar a alguien sin darle la administracion.
+# Sin valor por defecto a proposito: si no esta en el entorno, nadie desbloquea.
+CONSEJERO_CLAVE_MENSAJES = os.getenv("CONSEJERO_CLAVE_MENSAJES", "")
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 # `OPENAI_DEFAULT_MODEL` es el nombre que ya venia en el .env.

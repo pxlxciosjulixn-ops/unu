@@ -483,8 +483,14 @@ CUPO_POR_VISITANTE: dict[str, int | None] = {
     Conversation.Scope.GENERAL: None,
     Conversation.Scope.RESUME: None,
     Conversation.Scope.FINANZAS: None,
-    Conversation.Scope.CONSEJOS: 30,
+    # Un solo mensaje gratis por conexion. Para mas, se desbloquean con la
+    # clave de mensajes desde Ajustes (ver `desbloquear_mensajes`).
+    Conversation.Scope.CONSEJOS: 1,
 }
+
+# Cuantos mensajes se pueden desbloquear de una vez con la clave de mensajes.
+MIN_MENSAJES_DESBLOQUEO = 10
+MAX_MENSAJES_DESBLOQUEO = 30
 
 
 class ChatError(Exception):
@@ -519,12 +525,14 @@ def cupo_de(visitante: str, alcance: str) -> dict[str, int | None]:
     tope = CUPO_POR_VISITANTE.get(alcance)
     if PreferenciaVisitante.objects.filter(visitor=visitante, sin_limite=True).exists():
         tope = None
-    gastados = (
+    gastados, extra = (
         ChatQuota.objects.filter(visitor=visitante, scope=alcance)
-        .values_list("used", flat=True)
+        .values_list("used", "extra")
         .first()
-        or 0
+        or (0, 0)
     )
+    if tope is not None:
+        tope += extra
     return {
         "used": gastados,
         "limit": tope,
@@ -544,6 +552,22 @@ def gastar_del_cupo(visitante: str, alcance: str) -> None:
         # `F` deja el incremento en la base: dos peticiones a la vez no se
         # pisan el contador.
         ChatQuota.objects.filter(pk=fila.pk).update(used=F("used") + 1)
+
+
+def desbloquear_mensajes(visitante: str, alcance: str, cantidad: int) -> dict[str, int | None]:
+    """
+    Deja al visitante con exactamente `cantidad` mensajes por delante.
+
+    No se suman a los que le quedaban: el tope por vez es 30, y si se sumaran
+    bastaria con repetir la clave para acumular cientos. Si ya los gasto,
+    vuelve a escribir la clave y elige otra vez.
+    """
+    base = CUPO_POR_VISITANTE.get(alcance) or 0
+    fila, _ = ChatQuota.objects.get_or_create(visitor=visitante, scope=alcance)
+    # remaining = base + extra - used  ->  extra = used + cantidad - base
+    fila.extra = max(fila.used + cantidad - base, 0)
+    fila.save(update_fields=["extra", "updated_at"])
+    return cupo_de(visitante, alcance)
 
 
 def titulo_desde(texto: str) -> str:
