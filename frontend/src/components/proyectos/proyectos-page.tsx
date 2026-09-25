@@ -31,10 +31,7 @@ import { Separator } from "@/components/ui/separator"
 
 /** Sin tildes ni mayúsculas: buscar "bi" tiene que encontrar "BI". */
 function normalizar(texto: string) {
-  return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+  return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 }
 
 function coincide(proyecto: Proyecto, busqueda: string) {
@@ -79,12 +76,12 @@ export function ProyectosPage() {
               Proyectos
             </h1>
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-              Cuatro aplicaciones en funcionamiento, no maquetas: comparten el
-              backend en Django. Entra a cualquiera.
+              Tres aplicaciones en funcionamiento, no maquetas: comparten el
+              backend en Django y la misma base de datos. Entra a cualquiera.
             </p>
           </div>
 
-          {/* Filtros. Con cuatro proyectos no hacen falta para encontrar nada;
+          {/* Filtros. Con tres proyectos no hacen falta para encontrar nada;
               sirven para ver de un vistazo con qué está hecho cada uno. */}
           <section aria-label="Filtros" className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">

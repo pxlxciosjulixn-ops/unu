@@ -1,18 +1,13 @@
 /**
  * Los proyectos que se muestran en `/proyectos`.
  *
- * Son las cuatro aplicaciones que corren en este mismo despliegue; nada de
+ * Son las tres aplicaciones que corren en este mismo despliegue; nada de
  * maquetas ni de trabajos que no se puedan abrir. Cada uno declara las
  * tecnologías con las que está hecho, que son las que alimentan el filtro de
  * la página: no hay una lista de tecnologías aparte que se pueda desfasar.
  */
 import type { LucideIcon } from "lucide-react"
-import {
-  BotIcon,
-  ChartColumnIcon,
-  DownloadIcon,
-  FileTextIcon,
-} from "lucide-react"
+import { BotIcon, ChartColumnIcon, FileTextIcon } from "lucide-react"
 
 export type Proyecto = {
   titulo: string
@@ -85,19 +80,6 @@ export const PROYECTOS: Proyecto[] = [
       "d3-geo",
       "Django REST",
     ],
-  },
-  {
-    titulo: "YouTube a MP3",
-    ruta: "/descargar-musica/mp3",
-    icono: DownloadIcon,
-    resumen: "Pega el enlace de una canción y bájala en MP3 hasta 320 kbps.",
-    anio: "2026",
-    detalle: [
-      "El MP3 sale con título, artista y carátula.",
-      "La conversión corre en segundo plano y la página muestra el avance.",
-      "Muestra cuánto pesará el archivo en cada calidad antes de bajarlo.",
-    ],
-    stack: ["React", "TypeScript", "shadcn", "Django REST", "yt-dlp", "ffmpeg"],
   },
 ]
 

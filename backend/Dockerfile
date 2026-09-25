@@ -19,11 +19,6 @@ WORKDIR /app
 # Las dependencias van primero: la capa se reaprovecha mientras
 # requirements.txt no cambie. `psycopg-binary` trae el driver compilado, asi
 # que no hace falta instalar compiladores ni libpq-dev.
-# ffmpeg: la pagina de descargas convierte el audio y une audio con video.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
