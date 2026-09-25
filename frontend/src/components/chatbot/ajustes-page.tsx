@@ -14,6 +14,7 @@ import { AppShell } from "@/components/app-shell"
 import {
   cambiarIlimitados,
   desbloquearAjustes,
+  desbloquearMensajes,
   guardarGroseria,
   guardarLargo,
   guardarPersonalidad,
@@ -170,6 +171,7 @@ export function AjustesPage() {
               ) : (
                 <>
                   <Groserias ajustes={ajustes} onCambio={setAjustes} />
+                  <MasMensajes ajustes={ajustes} onCambio={setAjustes} />
                   <Largo ajustes={ajustes} onCambio={setAjustes} />
                 </>
               )}
@@ -1159,5 +1161,128 @@ function TablaOpiniones({
         )
       })}
     </div>
+  )
+}
+
+/**
+ * Desbloquear mensajes: cada conexión tiene uno gratis y, con la clave de
+ * mensajes, elige cuántos más (de 10 a 30). No se acumulan: queda con
+ * exactamente los que eligió, y cuando se acaban vuelve a pedirlos.
+ */
+function MasMensajes({
+  ajustes,
+  onCambio,
+}: {
+  ajustes: AjustesConsejero
+  onCambio: (ajustes: AjustesConsejero) => void
+}) {
+  const [clave, setClave] = React.useState("")
+  const [cantidad, setCantidad] = React.useState(ajustes.unlock_min)
+  const [ocupado, setOcupado] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [listo, setListo] = React.useState<number | null>(null)
+
+  const quedan = ajustes.messages.remaining
+  const sinTope = ajustes.messages.limit === null
+
+  async function desbloquear(e: React.FormEvent) {
+    e.preventDefault()
+    setOcupado(true)
+    setError(null)
+    setListo(null)
+    try {
+      const nuevos = await desbloquearMensajes(clave, cantidad)
+      onCambio(nuevos)
+      setListo(nuevos.messages.remaining)
+      setClave("")
+    } catch (fallo: unknown) {
+      setError(
+        fallo instanceof Error ? fallo.message : "No se pudo desbloquear."
+      )
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <Seccion
+      titulo="Más mensajes"
+      detalle="Cada conexión tiene un mensaje gratis. Con la contraseña desbloqueas entre 10 y 30 más; cuando se acaben, vuelves a pedirlos."
+    >
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-4">
+        <span className="text-sm text-muted-foreground">Te quedan</span>
+        <span className="text-2xl font-semibold tabular-nums">
+          {sinTope
+            ? "Ilimitados"
+            : `${quedan ?? 0} ${quedan === 1 ? "mensaje" : "mensajes"}`}
+        </span>
+      </div>
+
+      {sinTope ? null : (
+        <form
+          onSubmit={(e) => void desbloquear(e)}
+          className="flex flex-col gap-4"
+        >
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <label
+                htmlFor="cantidad-mensajes"
+                className="text-sm font-medium"
+              >
+                ¿Cuántos quieres?
+              </label>
+              <span className="text-2xl font-semibold tabular-nums">
+                {cantidad}
+              </span>
+            </div>
+            <input
+              id="cantidad-mensajes"
+              type="range"
+              min={ajustes.unlock_min}
+              max={ajustes.unlock_max}
+              step={1}
+              value={cantidad}
+              onChange={(e) => setCantidad(Number(e.target.value))}
+              className="w-full accent-primary"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{ajustes.unlock_min}</span>
+              <span>{ajustes.unlock_max}</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="clave-mensajes" className="text-sm font-medium">
+              Contraseña
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="clave-mensajes"
+                type="password"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                placeholder="Escribe la contraseña"
+                autoComplete="off"
+                className="bg-background"
+              />
+              <Button type="submit" disabled={!clave || ocupado}>
+                <LockOpenIcon data-icon="inline-start" />
+                Desbloquear
+              </Button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {listo !== null ? (
+        <p role="status" className="text-sm">
+          Listo: ahora tienes {listo} {listo === 1 ? "mensaje" : "mensajes"}.
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </Seccion>
   )
 }

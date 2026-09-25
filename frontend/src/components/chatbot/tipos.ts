@@ -179,6 +179,11 @@ export type AjustesConsejero = {
   max_chars: number
   min_chars: number
   max_chars_limit: number
+  /** Cupo del consejero en esta conexión (1 gratis, más con la clave). */
+  messages: Cupo
+  /** Cuántos mensajes se pueden desbloquear de una vez. */
+  unlock_min: number
+  unlock_max: number
 }
 
 /** Cuántos 👍 y 👎 lleva un grupo (una personalidad, un nivel…). */

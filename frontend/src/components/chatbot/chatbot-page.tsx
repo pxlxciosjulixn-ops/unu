@@ -472,6 +472,24 @@ export function ChatbotPage() {
           onImportado={alImportar}
         />
       ) : null}
+      {sinCupo && enConsejos ? (
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm shadow-xs"
+        >
+          <span className="flex-1">
+            Te quedaste sin mensajes. Si tienes la contraseña, desbloquea entre
+            10 y 30 más.
+          </span>
+          <Button
+            size="sm"
+            nativeButton={false}
+            render={<Link to="/chatbot/ajustes" />}
+          >
+            Desbloquear
+          </Button>
+        </div>
+      ) : null}
       {aviso ? (
         <div
           role="status"
@@ -616,7 +634,7 @@ export function ChatbotPage() {
             aria-label="Mensaje"
             placeholder={
               sinCupo
-                ? "Se acabaron los mensajes de esta demostración"
+                ? "Te quedaste sin mensajes"
                 : revisando && enConsejos
                   ? "Pegue el mensaje que le piensa mandar…"
                   : enConsejos

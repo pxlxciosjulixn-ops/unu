@@ -267,6 +267,17 @@ export function traerOpiniones(clave: string) {
   })
 }
 
+/**
+ * Desbloquea mensajes con la clave de mensajes. La clave se compara en el
+ * servidor: aquí solo viaja lo que la persona escribió.
+ */
+export function desbloquearMensajes(clave: string, cantidad: number) {
+  return pedir<AjustesConsejero>("/api/chat/settings/messages/", {
+    method: "POST",
+    body: JSON.stringify({ password: clave, amount: cantidad }),
+  })
+}
+
 export function desbloquearAjustes(clave: string) {
   return pedir<void>("/api/chat/settings/unlock/", {
     method: "POST",
