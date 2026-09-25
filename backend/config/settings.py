@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "dashboard",
     "resume",
     "finanzas",
+    "descargas",
 ]
 
 MIDDLEWARE = [
@@ -189,6 +190,9 @@ REST_FRAMEWORK = {
         "finanzas": "30/min",
         # Consulta y subida de chats de WhatsApp para el consejero.
         "analisis": "30/min",
+        # Cada cancion gasta dos: leer el video y lanzar la descarga. Consultar
+        # el avance no cuenta.
+        "descargas": "20/min",
     },
 }
 

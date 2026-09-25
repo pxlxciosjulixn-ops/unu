@@ -76,6 +76,13 @@ const EditarGastosPage = lazy(() =>
   }))
 )
 
+// Descargas de YouTube: se abre desde /proyectos.
+const DescargarPage = lazy(() =>
+  import("@/components/descargas/descargar-page").then((m) => ({
+    default: m.DescargarPage,
+  }))
+)
+
 const LoginPage = lazy(() =>
   import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
 )
@@ -176,6 +183,14 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <EditarGastosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/descargar-musica/mp3"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <DescargarPage />
               </Suspense>
             }
           />
