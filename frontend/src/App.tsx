@@ -38,6 +38,12 @@ const Min2026Page = lazy(() =>
   }))
 )
 
+const MinAngelPage = lazy(() =>
+  import("@/components/min/min-angel-page").then((m) => ({
+    default: m.MinAngelPage,
+  }))
+)
+
 // Finanzas personales: publicas pero sin enlace desde ningun lado del sitio.
 const FormularioGastosPage = lazy(() =>
   import("@/components/finanzas/formulario-page").then((m) => ({
@@ -125,6 +131,14 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <Min2026Page />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/min-2026/angel"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <MinAngelPage />
               </Suspense>
             }
           />
