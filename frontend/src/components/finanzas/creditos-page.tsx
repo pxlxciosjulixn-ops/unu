@@ -14,6 +14,7 @@ import {
   mesActual,
   moverMes,
 } from "@/components/finanzas/analisis"
+import { AsistenteFinanzas } from "@/components/finanzas/asistente-finanzas"
 import {
   actualizarCredito,
   crearCredito,
@@ -214,7 +215,12 @@ export function CreditosGastosPage() {
           </Card>
         ) : (
           <>
-            <GraficaSaldos creditos={lista} movimientos={movimientos.data} />
+            <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-2">
+              <div className="min-w-0">
+                <AsistenteFinanzas tipo="creditos" />
+              </div>
+              <GraficaSaldos creditos={lista} movimientos={movimientos.data} />
+            </div>
             <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
               {lista
                 ? lista.map((c) => (
@@ -507,6 +513,14 @@ function TarjetaCredito({
               alerta={usoCupo !== null && usoCupo >= 90}
             />
           ) : null}
+          <Dato
+            titulo="Tasa"
+            valor={
+              c.tasa_ea === null
+                ? "Sin registrar"
+                : `${Number(c.tasa_ea).toLocaleString("es-CO")} % E.A.`
+            }
+          />
           {c.cuota !== null ? (
             <Dato
               titulo="Cuota"
@@ -658,6 +672,7 @@ function FormularioCredito({
   const [cuota, setCuota] = React.useState<number | null>(
     credito?.cuota ?? null
   )
+  const [tasa, setTasa] = React.useState(credito?.tasa_ea ?? "")
   const [errores, setErrores] = React.useState<Errores>({})
   const [fallo, setFallo] = React.useState<string | null>(null)
 
@@ -681,6 +696,8 @@ function FormularioCredito({
     if (saldo === null) encontrados.saldo_inicial = "Escribe cuánto debes."
     if (!/^\d{4}-\d{2}-\d{2}$/.test(desde))
       encontrados.fecha_inicio = "Elige la fecha."
+    if (tasa.trim() && !/^\d{1,3}([.,]\d{1,2})?$/.test(tasa.trim()))
+      encontrados.tasa_ea = "Escribe solo el número, por ejemplo 26,8."
     setErrores(encontrados)
     if (Object.keys(encontrados).length || saldo === null) return
 
@@ -690,6 +707,8 @@ function FormularioCredito({
       fecha_inicio: desde,
       cupo: cupo || null,
       cuota: cuota || null,
+      // "26,82" o "26.82": se guarda con punto.
+      tasa_ea: tasa.trim() ? tasa.trim().replace(",", ".") : null,
     }
     setGuardando(true)
     setFallo(null)
@@ -812,6 +831,37 @@ function FormularioCredito({
             </FieldLabel>
             {campoPesos("credito-cuota", cuota, setCuota)}
             <FieldDescription>Para saber cuánto falta.</FieldDescription>
+          </Field>
+          <Field
+            data-invalid={errores.tasa_ea ? true : undefined}
+            className="sm:col-span-2"
+          >
+            <FieldLabel htmlFor="credito-tasa">
+              Tasa efectiva anual (opcional)
+            </FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                id="credito-tasa"
+                inputMode="decimal"
+                value={tasa}
+                onChange={(e) => setTasa(e.target.value)}
+                placeholder="Ej.: 26,8"
+                autoComplete="off"
+                aria-invalid={errores.tasa_ea ? true : undefined}
+                className="tabular-nums"
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupText>% E.A.</InputGroupText>
+              </InputGroupAddon>
+            </InputGroup>
+            {errores.tasa_ea ? (
+              <FieldError>{errores.tasa_ea}</FieldError>
+            ) : (
+              <FieldDescription>
+                Sale en el extracto o en la app. Con ella el asesor sabe cuál
+                pagar primero y si te conviene una compra de cartera.
+              </FieldDescription>
+            )}
           </Field>
         </div>
       </FieldGroup>

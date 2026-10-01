@@ -8,6 +8,8 @@ caracteres) porque se manda completo en cada turno.
 
 from __future__ import annotations
 
+import math
+
 from django.db.models import Count, Min, Sum
 from django.utils import timezone
 
@@ -217,5 +219,48 @@ def _creditos() -> list[str]:
             partes.append(f"cupo {formato_pesos(c['cupo'])}")
         if c["cuota"]:
             partes.append(f"cuota {formato_pesos(c['cuota'])} al mes")
+        partes += _intereses(c)
         lineas.append(f"- {c['nombre']}: " + ", ".join(partes))
     return lineas
+
+
+def _intereses(c: dict) -> list[str]:
+    """
+    Tasa, interés de este mes y cuánto falta con la cuota actual, ya
+    calculados: el modelo se equivoca haciendo amortizaciones de cabeza.
+    """
+    if c["tasa_ea"] is None:
+        return ["tasa desconocida (no registrada)"]
+    ea = float(c["tasa_ea"]) / 100
+    mensual = (1 + ea) ** (1 / 12) - 1
+    saldo = max(c["saldo"], 0)
+    partes = [
+        f"tasa {float(c['tasa_ea']):.2f} % E.A. ({mensual * 100:.2f} % mensual)",
+        f"interés aproximado este mes {formato_pesos(round(saldo * mensual))}",
+    ]
+    cuota = c["cuota"]
+    if not cuota or not saldo:
+        return partes
+    if mensual == 0:
+        meses = math.ceil(saldo / cuota)
+    elif cuota <= saldo * mensual:
+        return partes + ["con esa cuota la deuda NO baja: no alcanza ni para los intereses"]
+    else:
+        meses = math.ceil(-math.log(1 - mensual * saldo / cuota) / math.log(1 + mensual))
+    partes.append(
+        f"con esa cuota termina en unos {meses} meses y paga unos "
+        f"{formato_pesos(max(0, round(meses * cuota - saldo)))} de intereses"
+    )
+    return partes
+
+
+def creditos_como_texto() -> str | None:
+    """
+    Lo que lee el asesor de créditos: las deudas y, si hay movimientos, el
+    resumen de finanzas (que ya trae los créditos). None si no hay nada.
+    """
+    finanzas = finanzas_como_texto()
+    if finanzas is not None:
+        return finanzas
+    lineas = _creditos()
+    return "\n".join(lineas) if lineas else None

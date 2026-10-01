@@ -10,7 +10,8 @@ export type Rol = "user" | "assistant"
  * servidor lo asigna solo cuando la conversación arranca con un chat de
  * WhatsApp como contexto.
  */
-export type Alcance = "general" | "resume" | "finanzas" | "consejos"
+export type Alcance =
+  "general" | "resume" | "finanzas" | "consejos" | "creditos"
 
 /**
  * Un chat de WhatsApp exportado que el visitante subió. El servidor solo

@@ -24,6 +24,8 @@ export type Credito = {
   fecha_inicio: string
   cupo: number | null
   cuota: number | null
+  /** Tasa efectiva anual en %, como texto ("26.82"); `null` si no se sabe. */
+  tasa_ea: string | null
   abonado: number
   avances: number
   saldo: number
@@ -33,7 +35,7 @@ export type Credito = {
 
 export type NuevoCredito = Pick<
   Credito,
-  "nombre" | "saldo_inicial" | "fecha_inicio" | "cupo" | "cuota"
+  "nombre" | "saldo_inicial" | "fecha_inicio" | "cupo" | "cuota" | "tasa_ea"
 >
 
 export function crearCredito(datos: NuevoCredito) {

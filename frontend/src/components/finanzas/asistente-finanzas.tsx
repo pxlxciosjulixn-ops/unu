@@ -46,26 +46,64 @@ const MensajeMarkdown = React.lazy(() =>
 )
 
 /**
- * Cuánto puede escribir la persona. Es el mismo número que
- * `MAX_CARACTERES_FINANZAS` en `chat/services.py`, que es quien lo valida.
+ * Cada asistente con su tope de pregunta. Son los mismos números de
+ * `MAX_CARACTERES_POR_ALCANCE` en `chat/services.py`, que es quien los valida.
  */
-const MAX_CARACTERES = 200
+const ASISTENTES = {
+  finanzas: {
+    id: "asistente",
+    titulo: "Asistente financiero",
+    descripcion: "Pregúntale por tus gastos e ingresos",
+    intro: "Conoce tus movimientos. Prueba con:",
+    sugerencias: [
+      "¿En qué gasto más este mes?",
+      "¿Cómo voy contra el mes pasado?",
+      "¿Cómo puedo ahorrar más?",
+    ],
+    placeholder: "Pregunta sobre tus finanzas…",
+    pensando: "Revisando tus números…",
+    maxCaracteres: 200,
+    alto: "h-72",
+  },
+  creditos: {
+    id: "asesor",
+    titulo: "Asesor de créditos",
+    descripcion:
+      "Experto en deudas: compra de cartera, qué pagar primero y cómo salir más rápido",
+    intro: "Conoce tus créditos, tasas y cuotas. Prueba con:",
+    sugerencias: [
+      "¿Qué crédito debería pagar primero?",
+      "¿Me conviene una compra de cartera?",
+      "Arma un plan para salir de deudas en un año",
+      "¿Cuánto me cuestan los avances de Solventa y LuckyPlata?",
+    ],
+    placeholder: "Pregunta sobre tus créditos y deudas…",
+    pensando: "Revisando tus créditos…",
+    maxCaracteres: 600,
+    alto: "h-96",
+  },
+} as const
 
-const SUGERENCIAS = [
-  "¿En qué gasto más este mes?",
-  "¿Cómo voy contra el mes pasado?",
-  "¿Cómo puedo ahorrar más?",
-]
+type TipoAsistente = keyof typeof ASISTENTES
 
 let contadorIds = 0
 const nuevoId = (prefijo: string) => `${prefijo}-${(contadorIds += 1)}`
 
 /**
- * Asistente de IA del dashboard. El servidor le pasa al modelo un resumen de
- * los movimientos en cada pregunta, así que responde con lo último
- * registrado. Sin cupo por visitante: preguntas cortas, respuestas cortas.
+ * Asistente de IA de finanzas. El servidor le pasa al modelo un resumen de
+ * los movimientos (y de los créditos) en cada pregunta, así que responde con
+ * lo último registrado. Sin cupo por visitante.
+ *
+ * `tipo` elige cuál: el del dashboard (preguntas cortas sobre gastos) o el
+ * asesor de la página de créditos (planes para salir de deudas).
  */
-export function AsistenteFinanzas() {
+export function AsistenteFinanzas({
+  tipo = "finanzas",
+}: {
+  tipo?: TipoAsistente
+}) {
+  const config = ASISTENTES[tipo]
+  const MAX_CARACTERES = config.maxCaracteres
   const [mensajes, setMensajes] = React.useState<Mensaje[]>([])
   const [borrador, setBorrador] = React.useState("")
   const [ocupado, setOcupado] = React.useState(false)
@@ -106,7 +144,7 @@ export function AsistenteFinanzas() {
         limpio,
         conversacionRef.current,
         controlador.signal,
-        "finanzas"
+        tipo
       )) {
         if (evento.type === "start") {
           conversacionRef.current = evento.conversation_id
@@ -144,10 +182,10 @@ export function AsistenteFinanzas() {
   }
 
   return (
-    <Card id="asistente" className="scroll-mt-20">
+    <Card id={config.id} className="scroll-mt-20">
       <CardHeader>
-        <CardTitle>Asistente financiero</CardTitle>
-        <CardDescription>Pregúntale por tus gastos e ingresos</CardDescription>
+        <CardTitle>{config.titulo}</CardTitle>
+        <CardDescription>{config.descripcion}</CardDescription>
         {mensajes.length > 0 ? (
           <CardAction>
             <Button
@@ -165,17 +203,22 @@ export function AsistenteFinanzas() {
 
       <CardContent className="flex min-h-72 flex-1 flex-col">
         <MessageScrollerProvider autoScroll>
-          <MessageScroller className="h-72 min-h-0 flex-1 rounded-lg border bg-muted/30">
+          <MessageScroller
+            className={cn(
+              "min-h-0 flex-1 rounded-lg border bg-muted/30",
+              config.alto
+            )}
+          >
             <MessageScrollerViewport>
               <MessageScrollerContent className="flex flex-col gap-3 p-3">
                 {mensajes.length === 0 ? (
                   <MessageScrollerItem scrollAnchor={false}>
                     <div className="flex flex-col gap-3 pt-2">
                       <p className="text-sm text-muted-foreground">
-                        Conoce tus movimientos. Prueba con:
+                        {config.intro}
                       </p>
                       <div className="flex flex-col items-start gap-1.5">
-                        {SUGERENCIAS.map((s) => (
+                        {config.sugerencias.map((s) => (
                           <Button
                             key={s}
                             variant="outline"
@@ -237,7 +280,7 @@ export function AsistenteFinanzas() {
                       className="flex items-center gap-2 text-xs text-muted-foreground"
                     >
                       <Spinner className="size-3.5" />
-                      Revisando tus números…
+                      {config.pensando}
                     </p>
                   </MessageScrollerItem>
                 ) : null}
@@ -278,7 +321,7 @@ export function AsistenteFinanzas() {
                   void enviar(borrador)
                 }
               }}
-              placeholder="Pregunta sobre tus finanzas…"
+              placeholder={config.placeholder}
               rows={1}
               aria-label="Pregunta para el asistente"
               maxLength={MAX_CARACTERES}

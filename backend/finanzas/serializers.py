@@ -61,6 +61,7 @@ class CreditoSerializer(serializers.ModelSerializer):
             "fecha_inicio",
             "cupo",
             "cuota",
+            "tasa_ea",
             "abonado",
             "avances",
             "saldo",

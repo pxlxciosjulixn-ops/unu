@@ -144,10 +144,11 @@ class ChatsContextoTests(TestCase):
             "/api/chat/", {"message": "hazme una tarea"}, content_type="application/json"
         )
         cuerpo = b"".join(respuesta.streaming_content).decode()
-        self.assertIn("no para sus maricadas", cuerpo)
+        # Sin elegir nivel de groserías va el suave, que no dice groserías.
+        self.assertIn("Este chat fue creado por Julian", cuerpo)
         self.assertEqual(
             Conversation.objects.get().messages.last().content,
-            services.RESPUESTA_FUERA_DE_TEMA,
+            services.RESPUESTA_FUERA_DE_TEMA_SUAVE,
         )
 
     def test_conversacion_con_chat_es_del_consejero(self):
@@ -205,7 +206,7 @@ class NuevasFuncionesTests(TestCase):
 
     def test_groserias_por_visitante_y_largo_con_clave(self):
         ajustes = self.cliente.get("/api/chat/settings/").json()
-        self.assertEqual(ajustes["profanity"], "sin_filtro")
+        self.assertEqual(ajustes["profanity"], "suave")
         self.assertEqual(ajustes["max_chars"], 200)
 
         self.cliente.put(
@@ -354,8 +355,9 @@ class PersonalidadTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(cliente.get("/api/chat/settings/").json()["personality"], "abuela")
-        # El nivel de groserías no se toca al cambiar la personalidad.
-        self.assertEqual(cliente.get("/api/chat/settings/").json()["profanity"], "sin_filtro")
+        # El nivel de groserías no se toca al cambiar la personalidad: sigue
+        # en el de por defecto, que es suave.
+        self.assertEqual(cliente.get("/api/chat/settings/").json()["profanity"], "suave")
         self.assertIn("abuela", services.sistema_consejos("sin_filtro", 200, "abuela"))
         self.assertEqual(
             cliente.put(
@@ -406,8 +408,9 @@ class OpinionesYSinLimiteTests(TestCase):
         ).json()
         # Cambiar de opinión no duplica el voto.
         self.assertEqual((stats["total"], stats["up"]), (1, 1))
-        sin_filtro = next(g for g in stats["by_profanity"] if g["key"] == "sin_filtro")
-        self.assertEqual(sin_filtro["up"], 1)
+        # Sin elegir nivel, la opinión cuenta en el de por defecto: suave.
+        suave = next(g for g in stats["by_profanity"] if g["key"] == "suave")
+        self.assertEqual(suave["up"], 1)
 
         conversacion = self.mia.get("/api/chat/conversations/").json()["results"][0]
         mensajes = self.mia.get(f"/api/chat/conversations/{conversacion['id']}/").json()["messages"]

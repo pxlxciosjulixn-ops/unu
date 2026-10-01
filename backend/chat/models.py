@@ -92,7 +92,7 @@ class PreferenciaVisitante(models.Model):
     )
     groseria = models.CharField(
         "nivel de grosería", max_length=16, choices=Groseria.choices,
-        default=Groseria.SIN_FILTRO,
+        default=Groseria.SUAVE,
     )
 
     class Personalidad(models.TextChoices):
@@ -155,6 +155,7 @@ class Conversation(models.Model):
         RESUME = "resume", "Solo la hoja de vida"
         FINANZAS = "finanzas", "Finanzas personales"
         CONSEJOS = "consejos", "Consejos sobre un chat de WhatsApp"
+        CREDITOS = "creditos", "Asesor de créditos y deudas"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     visitor = models.CharField(

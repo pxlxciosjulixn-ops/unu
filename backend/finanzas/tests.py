@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from decimal import Decimal
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -160,3 +161,38 @@ class ExportarTests(TestCase):
             modelos,
             {"finanzas.movimiento", "finanzas.credito", "finanzas.sugerencia"},
         )
+
+
+class AsesorCreditosTests(TestCase):
+    def test_contexto_trae_tasa_intereses_y_plazo(self):
+        from finanzas.contexto import creditos_como_texto
+
+        Credito.objects.create(
+            nombre="Solventa",
+            saldo_inicial=1_000_000,
+            fecha_inicio=date(2026, 9, 1),
+            tasa_ea=Decimal("26.82"),
+            cuota=100_000,
+        )
+        Credito.objects.create(
+            nombre="Nu", saldo_inicial=1_000_000, fecha_inicio=date(2026, 9, 1),
+            tasa_ea=Decimal("40"), cuota=5_000,
+        )
+        texto = creditos_como_texto()
+        self.assertIn("26.82 % E.A. (2.00 % mensual)", texto)
+        self.assertIn("termina en unos 12 meses", texto)
+        self.assertIn("NO baja", texto)
+
+    def test_el_chat_de_creditos_usa_su_asesor(self):
+        from chat.models import Conversation
+        from chat.services import SIN_CREDITOS, SISTEMA_CREDITOS, sistema_para
+
+        conversacion = Conversation(visitor="x", scope=Conversation.Scope.CREDITOS)
+        self.assertEqual(sistema_para(conversacion), SIN_CREDITOS)
+        Credito.objects.create(
+            nombre="Addi", saldo_inicial=300_000, fecha_inicio=date(2026, 9, 1)
+        )
+        sistema = sistema_para(conversacion)
+        self.assertTrue(sistema.startswith(SISTEMA_CREDITOS))
+        self.assertIn("Addi: saldo $ 300.000", sistema)
+        self.assertIn("tasa desconocida", sistema)

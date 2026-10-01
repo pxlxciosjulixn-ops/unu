@@ -182,6 +182,16 @@ class Credito(models.Model):
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(VALOR_MAX)],
     )
+    # Tasa efectiva anual en %, para saber cuál sale más caro y cuánto se
+    # paga de intereses. Vacía si no se sabe.
+    tasa_ea = models.DecimalField(
+        "tasa efectiva anual (%)",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(1000)],
+    )
     # Lo que se paga al mes, para calcular cuánto falta.
     cuota = models.BigIntegerField(
         "cuota mensual",
