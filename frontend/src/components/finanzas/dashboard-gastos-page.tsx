@@ -273,12 +273,15 @@ export function DashboardGastosPage() {
                 <ToggleGroupItem
                   key={p.valor}
                   value={p.valor}
-                  className="flex-1 lg:flex-none"
+                  className="flex-1 px-1 text-xs sm:px-2.5 sm:text-[0.8rem] lg:flex-none"
                 >
                   {p.etiqueta}
                 </ToggleGroupItem>
               ))}
-              <ToggleGroupItem value="fechas" className="flex-1 lg:flex-none">
+              <ToggleGroupItem
+                value="fechas"
+                className="flex-1 px-1 text-xs sm:px-2.5 sm:text-[0.8rem] lg:flex-none"
+              >
                 Fechas
               </ToggleGroupItem>
             </ToggleGroup>

@@ -21,7 +21,7 @@ from finanzas.calculos import (
     primer_dia,
     resumen_mes,
 )
-from finanzas.models import Credito, Movimiento
+from finanzas.models import Credito, GastoFijo, Movimiento
 
 
 def _pct(valor: float | None) -> str:
@@ -176,6 +176,7 @@ def _analisis(hoy, mes, actual: ResumenMes) -> list[str]:
         cursor = mes_anterior(cursor)
 
     lineas += _creditos()
+    lineas += _gastos_fijos()
 
     topes = analisis.presupuestos(mes)
     if topes:
@@ -212,13 +213,23 @@ def _creditos() -> list[str]:
     for c in datos:
         partes = [
             f"saldo {formato_pesos(c['saldo'])}",
-            f"abonado {formato_pesos(c['abonado'])}",
+            f"pagado {formato_pesos(c['abonado'])}",
             f"avances {formato_pesos(c['avances'])} desde {c['fecha_inicio']}",
         ]
         if c["cupo"]:
             partes.append(f"cupo {formato_pesos(c['cupo'])}")
         if c["cuota"]:
             partes.append(f"cuota {formato_pesos(c['cuota'])} al mes")
+        if c["costo_pct"] is not None:
+            partes.append(
+                f"de cada pago {float(c['costo_pct']):.1f} % se va en intereses y "
+                f"seguros: de lo pagado, {formato_pesos(c['capital_abonado'])} fue a "
+                f"capital y {formato_pesos(c['costos_en_pagos'])} a intereses y seguros"
+            )
+        if c["total_cargos"]:
+            partes.append(
+                f"intereses y cargos cobrados {formato_pesos(c['total_cargos'])}"
+            )
         partes += _intereses(c)
         lineas.append(f"- {c['nombre']}: " + ", ".join(partes))
     return lineas
@@ -261,6 +272,102 @@ def creditos_como_texto() -> str | None:
     """
     finanzas = finanzas_como_texto()
     if finanzas is not None:
-        return finanzas
+        return finanzas + "\n" + "\n".join(_para_aconsejar())
     lineas = _creditos()
     return "\n".join(lineas) if lineas else None
+
+
+def _gastos_fijos() -> list[str]:
+    """Lo de cada mes (Mamá, arriendo…): cuánto se debe este mes y si ya se pagó."""
+    from finanzas.serializers import GastoFijoSerializer
+
+    datos = GastoFijoSerializer(GastoFijo.objects.all(), many=True).data
+    if not datos:
+        return []
+    lineas = [
+        "Gastos fijos de este mes (un gasto con el concepto es un pago; un "
+        "ingreso es un préstamo de esa persona y se suma a lo que se le debe):"
+    ]
+    for f in datos:
+        m = f["este_mes"]
+        if m is None:
+            lineas.append(
+                f"- {f['nombre']}: programado, {formato_pesos(f['monto'])} "
+                f"a pagar en {f['proximo']['mes']}"
+            )
+            continue
+        detalle = [
+            f"fijo {formato_pesos(f['monto'])}",
+            f"pagado {formato_pesos(m['pagado'])}",
+        ]
+        if m["prestado"]:
+            detalle.append(f"le prestó {formato_pesos(m['prestado'])}")
+        if m["arrastre"]:
+            detalle.append(f"venía de antes {formato_pesos(m['arrastre'])}")
+        detalle.append(f"falta {formato_pesos(f['pendiente_mes'])} ({f['estado']})")
+        if f["fecha_fin"]:
+            detalle.append(f"hasta {f['fecha_fin'][:7]}")
+        lineas.append(f"- {f['nombre']}: " + ", ".join(detalle))
+    return lineas
+
+
+def _para_aconsejar() -> list[str]:
+    """
+    Lo que el asesor necesita para decir de dónde sacar plata: promedio de
+    cada concepto, gastos hormiga y lo que queda libre al mes.
+    """
+    from collections import defaultdict
+
+    from finanzas.conceptos import clave, mapa
+
+    hoy = timezone.localdate()
+    mes = primer_dia(hoy)
+    desde = mes_anterior(mes_anterior(mes_anterior(mes)))
+    movimientos = list(Movimiento.objects.filter(fecha__gte=desde, fecha__lt=mes))
+    if not movimientos:
+        return []
+    meses = len({primer_dia(m.fecha) for m in movimientos}) or 1
+    nombres = mapa()
+
+    totales: dict[str, int] = defaultdict(int)
+    veces: dict[str, int] = defaultdict(int)
+    ingresos = gastos = 0
+    for m in movimientos:
+        if m.tipo == Movimiento.Tipo.INGRESO:
+            ingresos += m.valor
+            continue
+        gastos += m.valor
+        llave = clave(m.concepto)
+        totales[llave] += m.valor
+        veces[llave] += 1
+
+    def nombre(llave: str) -> str:
+        return nombres.get(llave) or llave.capitalize()
+
+    lineas = [
+        f"Promedio de los últimos {meses} meses cerrados: entran "
+        f"{formato_pesos(round(ingresos / meses))} y salen "
+        f"{formato_pesos(round(gastos / meses))} al mes; libre "
+        f"{formato_pesos(round((ingresos - gastos) / meses))} al mes.",
+        "Gasto promedio al mes por concepto (mayor a menor):",
+    ]
+    for llave, total in sorted(totales.items(), key=lambda par: -par[1])[:15]:
+        lineas.append(
+            f"- {nombre(llave)}: {formato_pesos(round(total / meses))} al mes, "
+            f"{veces[llave] / meses:.0f} veces al mes"
+        )
+    # Gastos hormiga: muchas compras chicas que suman.
+    hormiga = [
+        (llave, total)
+        for llave, total in totales.items()
+        if veces[llave] / meses >= 6 and total / veces[llave] <= 30_000
+    ]
+    if hormiga:
+        lineas.append(
+            "Gastos hormiga (muchas compras chicas al mes): "
+            + "; ".join(
+                f"{nombre(llave)} {formato_pesos(round(total / meses))} al mes"
+                for llave, total in sorted(hormiga, key=lambda par: -par[1])
+            )
+        )
+    return lineas

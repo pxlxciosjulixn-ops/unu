@@ -212,7 +212,7 @@ export function TablaMovimientos({
                       {m.concepto}
                     </span>
                     {m.automatico ? (
-                      <span className="block text-xs text-muted-foreground">
+                      <span className="block truncate text-xs text-muted-foreground">
                         Automático: lo que sobró de los meses anteriores
                       </span>
                     ) : null}

@@ -1,6 +1,7 @@
 """
 Backup de todo lo de finanzas en JSON: movimientos (gastos e ingresos),
-créditos, sugerencias de concepto (con su grupo y presupuesto), avisos de
+créditos con sus intereses y cargos, gastos fijos (Mamá, arriendo…), el
+salario, sugerencias de concepto (con su grupo y presupuesto), avisos de
 correo ya enviados y ajustes de diseño.
 
 Uso, desde cualquier carpeta:

@@ -2,9 +2,11 @@ import * as React from "react"
 import {
   CircleAlertIcon,
   PencilIcon,
+  PercentIcon,
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react"
 import { Link } from "react-router-dom"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
@@ -16,10 +18,17 @@ import {
 } from "@/components/finanzas/analisis"
 import { AsistenteFinanzas } from "@/components/finanzas/asistente-finanzas"
 import {
+  aCapital,
   actualizarCredito,
+  crearCargo,
   crearCredito,
   efecto,
+  eliminarCargo,
   eliminarCredito,
+  mesesParaPagar,
+  tasaMensual,
+  TIPOS_CARGO,
+  type TipoCargo,
   movimientosDe,
   RUTA_API_CREDITOS,
   serieSaldos,
@@ -37,7 +46,17 @@ import {
   VALOR_MAX,
   type Movimiento,
 } from "@/components/finanzas/finanzas"
+import {
+  RUTA_API_FIJOS,
+  seVe,
+  VISTAS,
+  type GastoFijo,
+  type Vista,
+} from "@/components/finanzas/fijos"
 import { FinanzasShell } from "@/components/finanzas/finanzas-shell"
+import { GastosFijos } from "@/components/finanzas/gastos-fijos"
+import { LineaProximoPago } from "@/components/finanzas/proximo-pago"
+import { Simulacion } from "@/components/finanzas/simulacion"
 import { useSugerencias } from "@/components/finanzas/use-sugerencias"
 import {
   Alert,
@@ -96,6 +115,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useApi } from "@/hooks/use-api"
 import {
   formatearPesos,
@@ -139,12 +159,18 @@ export function CreditosGastosPage() {
   )
   const [editando, setEditando] = React.useState<Credito | "nuevo" | null>(null)
   const [borrando, setBorrando] = React.useState<Credito | null>(null)
+  const [cargando, setCargando] = React.useState<Credito | null>(null)
+  // Por defecto solo lo que aún hay que pagar.
+  const [vista, setVista] = React.useState<Vista>("pendientes")
 
+  const fijos = useApi<GastoFijo[]>(RUTA_API_FIJOS)
   const recargar = () => {
     creditos.recargar()
     movimientos.recargar()
+    fijos.recargar()
   }
   const lista = creditos.data
+  const visibles = lista?.filter((c) => seVe(c.saldo <= 0, vista)) ?? null
 
   return (
     <FinanzasShell
@@ -198,6 +224,12 @@ export function CreditosGastosPage() {
 
         <Resumen creditos={lista} />
 
+        <Simulacion
+          creditos={lista}
+          fijos={fijos.data}
+          movimientos={movimientos.data}
+        />
+
         {lista && lista.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -221,15 +253,25 @@ export function CreditosGastosPage() {
               </div>
               <GraficaSaldos creditos={lista} movimientos={movimientos.data} />
             </div>
+            <FiltroVista vista={vista} onCambiar={setVista} />
+            {visibles && visibles.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                {vista === "pagados"
+                  ? "Todavía no has terminado de pagar ningún crédito."
+                  : "No hay créditos con saldo pendiente. ¡Bien ahí!"}
+              </p>
+            ) : null}
             <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
-              {lista
-                ? lista.map((c) => (
+              {visibles
+                ? visibles.map((c) => (
                     <TarjetaCredito
                       key={c.id}
                       credito={c}
                       movimientos={movimientos.data}
                       onEditar={() => setEditando(c)}
                       onBorrar={() => setBorrando(c)}
+                      onCargo={() => setCargando(c)}
+                      onCambio={recargar}
                     />
                   ))
                 : Array.from({ length: 4 }, (_, i) => (
@@ -238,6 +280,14 @@ export function CreditosGastosPage() {
             </div>
           </>
         )}
+
+        <GastosFijos
+          fijos={fijos.data}
+          vista={vista}
+          sugerencias={nombres}
+          ocupados={(lista ?? []).map((c) => c.nombre)}
+          onCambio={recargar}
+        />
       </div>
 
       <DialogoCredito
@@ -247,6 +297,14 @@ export function CreditosGastosPage() {
         onCerrar={() => setEditando(null)}
         onGuardado={() => {
           setEditando(null)
+          recargar()
+        }}
+      />
+      <DialogoCargo
+        credito={cargando}
+        onCerrar={() => setCargando(null)}
+        onGuardado={() => {
+          setCargando(null)
           recargar()
         }}
       />
@@ -269,7 +327,7 @@ export default CreditosGastosPage
 function Resumen({ creditos }: { creditos: Credito[] | null }) {
   if (!creditos) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-28 w-full rounded-xl" />
         ))}
@@ -304,12 +362,15 @@ function Resumen({ creditos }: { creditos: Credito[] | null }) {
     },
   ]
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div
+      id="resumen-creditos"
+      className="grid scroll-mt-20 grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"
+    >
       {cifras.map((c) => (
         <Card key={c.titulo}>
           <CardHeader>
             <CardDescription>{c.titulo}</CardDescription>
-            <CardTitle className="text-2xl break-all tabular-nums">
+            <CardTitle className="text-lg break-all tabular-nums sm:text-2xl">
               {c.valor}
             </CardTitle>
           </CardHeader>
@@ -419,26 +480,79 @@ function GraficaSaldos({
   )
 }
 
+type Linea = {
+  clave: string
+  fecha: string
+  etiqueta: string
+  /** Positivo sube la deuda, negativo la baja. */
+  efecto: number
+  /** Lo que se movió de plata (en un pago, el pago entero). */
+  monto: number
+  cargoId?: number
+}
+
 function TarjetaCredito({
   credito: c,
   movimientos,
   onEditar,
   onBorrar,
+  onCargo,
+  onCambio,
 }: {
   credito: Credito
   movimientos: Movimiento[] | null
   onEditar: () => void
   onBorrar: () => void
+  onCargo: () => void
+  onCambio: () => void
 }) {
-  // Lo que se llegó a deber (lo inicial más los avances) y cuánto se ha pagado.
-  const total = c.saldo_inicial + c.avances
-  const pagadoPct = total > 0 ? (c.abonado / total) * 100 : 0
+  // Lo que se llegó a deber (lo inicial, los avances y los cargos) y cuánto
+  // se ha pagado.
+  const total = c.saldo_inicial + c.avances + c.total_cargos
+  const pagadoPct = total > 0 ? (c.capital_abonado / total) * 100 : 0
   const usoCupo = c.cupo ? (c.saldo / c.cupo) * 100 : null
-  const mesesFaltan =
-    c.cuota && c.saldo > 0 ? Math.ceil(c.saldo / c.cuota) : null
-  const ultimos = movimientos
-    ? movimientosDe(c, movimientos).slice(-5).reverse()
+  const mesesFaltan = mesesParaPagar(c)
+  const [quitando, setQuitando] = React.useState<number | null>(null)
+
+  // Abonos, avances y cargos juntos, del más nuevo al más viejo.
+  const ultimos: Linea[] | null = movimientos
+    ? [
+        ...movimientosDe(c, movimientos).map((m) => ({
+          clave: `m${m.id}`,
+          fecha: m.fecha,
+          etiqueta:
+            m.tipo === "gasto"
+              ? c.costo_pct !== null
+                ? `Pago · ${formatearPesos(aCapital(m.valor, c.costo_pct))} a capital`
+                : "Abono"
+              : "Avance",
+          efecto: efecto(m.tipo, m.valor, c.costo_pct),
+          monto: m.valor,
+        })),
+        ...c.cargos.map((cargo) => ({
+          clave: `c${cargo.id}`,
+          fecha: cargo.fecha,
+          etiqueta:
+            TIPOS_CARGO.find((t) => t.valor === cargo.tipo)?.etiqueta ??
+            "Cargo",
+          efecto: cargo.valor,
+          monto: cargo.valor,
+          cargoId: cargo.id,
+        })),
+      ]
+        .sort((a, b) => b.fecha.localeCompare(a.fecha))
+        .slice(0, 6)
     : null
+
+  async function quitarCargo(id: number) {
+    setQuitando(id)
+    try {
+      await eliminarCargo(id)
+      onCambio()
+    } finally {
+      setQuitando(null)
+    }
+  }
 
   return (
     <Card>
@@ -448,6 +562,15 @@ function TarjetaCredito({
           Desde el {formatearFechaLocal(c.fecha_inicio)}
         </CardDescription>
         <CardAction className="flex gap-1">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onCargo}
+            aria-label={`Anotar un cargo extra de ${c.nombre}`}
+            title="Cargo extra suelto (manejo, mora…)"
+          >
+            <PercentIcon />
+          </Button>
           <Button
             size="icon-sm"
             variant="ghost"
@@ -487,7 +610,7 @@ function TarjetaCredito({
 
         <div className="flex flex-col gap-1.5">
           <span className="flex justify-between text-xs text-muted-foreground">
-            <span>Pagado</span>
+            <span>Capital pagado</span>
             <span className="tabular-nums">
               {formatearPorcentaje(Math.min(pagadoPct, 100), 0)}
             </span>
@@ -503,8 +626,33 @@ function TarjetaCredito({
             titulo="Saldo inicial"
             valor={formatearPesos(c.saldo_inicial)}
           />
-          <Dato titulo="Abonado" valor={`−${formatearPesos(c.abonado)}`} />
+          <Dato
+            titulo="Pagado"
+            valor={formatearPesos(c.abonado)}
+            detalle={
+              c.costo_pct !== null
+                ? `${formatearPesos(c.capital_abonado)} a capital`
+                : undefined
+            }
+          />
+          <Dato
+            titulo="Intereses y seguros"
+            valor={formatearPesos(c.costos_en_pagos)}
+            detalle={
+              c.costo_pct !== null
+                ? `${Number(c.costo_pct).toLocaleString("es-CO")} % de cada pago`
+                : "Sin registrar (lápiz)"
+            }
+            alerta={c.costos_en_pagos > 0}
+          />
           <Dato titulo="Avances" valor={`+${formatearPesos(c.avances)}`} />
+          {c.total_cargos > 0 ? (
+            <Dato
+              titulo="Cargos extra"
+              valor={`+${formatearPesos(c.total_cargos)}`}
+              alerta
+            />
+          ) : null}
           {c.cupo !== null ? (
             <Dato
               titulo="Cupo libre"
@@ -526,37 +674,64 @@ function TarjetaCredito({
               titulo="Cuota"
               valor={formatearPesos(c.cuota)}
               detalle={
-                mesesFaltan
-                  ? `Faltan ~${mesesFaltan} ${mesesFaltan === 1 ? "mes" : "meses"}`
-                  : undefined
+                mesesFaltan === Infinity
+                  ? "No alcanza ni para los intereses"
+                  : mesesFaltan
+                    ? `Faltan ~${mesesFaltan} ${mesesFaltan === 1 ? "mes" : "meses"}${c.tasa_ea === null && c.costo_pct === null ? " (sin contar intereses)" : ""}`
+                    : undefined
               }
+              alerta={mesesFaltan === Infinity}
             />
           ) : null}
         </dl>
 
         <div className="flex flex-col gap-1">
-          <p className="text-xs text-muted-foreground">Últimos movimientos</p>
+          <LineaProximoPago proximo={c.proximo} />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Últimos movimientos y cargos
+          </p>
           {!ultimos ? (
             <Skeleton className="h-20 w-full" />
           ) : ultimos.length === 0 ? (
             <p className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
-              Todavía no hay abonos ni avances. Registra un gasto con el
+              Todavía no hay abonos, avances ni cargos. Registra un gasto con el
               concepto “{c.nombre}” para abonar.
             </p>
           ) : (
             <ul className="flex flex-col divide-y text-sm">
-              {ultimos.map((m) => (
-                <li key={m.id} className="flex items-center gap-2 py-1.5">
+              {ultimos.map((l) => (
+                <li key={l.clave} className="flex items-center gap-2 py-1.5">
                   <span className="w-28 shrink-0 text-xs whitespace-nowrap text-muted-foreground tabular-nums">
-                    {formatearFechaLocal(m.fecha)}
+                    {formatearFechaLocal(l.fecha)}
                   </span>
-                  <span className="flex-1 text-xs">
-                    {m.tipo === "gasto" ? "Abono" : "Avance"}
+                  <span
+                    className={cn(
+                      "flex-1 text-xs",
+                      l.cargoId !== undefined && "text-destructive"
+                    )}
+                  >
+                    {l.etiqueta}
                   </span>
                   <span className="font-medium tabular-nums">
-                    {efecto(m.tipo, m.valor) > 0 ? "+" : "−"}
-                    {formatearPesos(m.valor)}
+                    {l.efecto > 0 ? "+" : "−"}
+                    {formatearPesos(l.monto)}
                   </span>
+                  {/* Los cargos se quitan aquí; los abonos y avances, en
+                      Editar movimientos. */}
+                  {l.cargoId !== undefined ? (
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => void quitarCargo(l.cargoId!)}
+                      disabled={quitando === l.cargoId}
+                      aria-label={`Quitar ${l.etiqueta.toLowerCase()}`}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      {quitando === l.cargoId ? <Spinner /> : <XIcon />}
+                    </Button>
+                  ) : (
+                    <span className="size-6 shrink-0" />
+                  )}
                 </li>
               ))}
             </ul>
@@ -619,7 +794,7 @@ function DialogoCredito({
         if (!abierto && !guardando) onCerrar()
       }}
     >
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {existente ? `Editar ${existente.nombre}` : "Nuevo crédito"}
@@ -673,6 +848,7 @@ function FormularioCredito({
     credito?.cuota ?? null
   )
   const [tasa, setTasa] = React.useState(credito?.tasa_ea ?? "")
+  const [costo, setCosto] = React.useState(credito?.costo_pct ?? "")
   const [errores, setErrores] = React.useState<Errores>({})
   const [fallo, setFallo] = React.useState<string | null>(null)
 
@@ -698,6 +874,14 @@ function FormularioCredito({
       encontrados.fecha_inicio = "Elige la fecha."
     if (tasa.trim() && !/^\d{1,3}([.,]\d{1,2})?$/.test(tasa.trim()))
       encontrados.tasa_ea = "Escribe solo el número, por ejemplo 26,8."
+    if (
+      costo.trim() &&
+      !(
+        /^\d{1,3}([.,]\d{1,2})?$/.test(costo.trim()) &&
+        Number(costo.trim().replace(",", ".")) <= 100
+      )
+    )
+      encontrados.costo_pct = "Un porcentaje entre 0 y 100, por ejemplo 64,2."
     setErrores(encontrados)
     if (Object.keys(encontrados).length || saldo === null) return
 
@@ -709,6 +893,7 @@ function FormularioCredito({
       cuota: cuota || null,
       // "26,82" o "26.82": se guarda con punto.
       tasa_ea: tasa.trim() ? tasa.trim().replace(",", ".") : null,
+      costo_pct: costo.trim() ? costo.trim().replace(",", ".") : null,
     }
     setGuardando(true)
     setFallo(null)
@@ -863,6 +1048,11 @@ function FormularioCredito({
               </FieldDescription>
             )}
           </Field>
+          <CampoCosto
+            valor={costo}
+            onCambiar={setCosto}
+            error={errores.costo_pct}
+          />
         </div>
       </FieldGroup>
 
@@ -948,5 +1138,356 @@ function DialogoBorrarCredito({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Intereses u otro cargo que la entidad le sumó a la deuda. Con la tasa
+ * registrada, el valor arranca con el interés estimado del mes; lo justo es
+ * poner el que sale en el extracto.
+ */
+function DialogoCargo({
+  credito,
+  onCerrar,
+  onGuardado,
+}: {
+  credito: Credito | null
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const [guardando, setGuardando] = React.useState(false)
+  return (
+    <Dialog
+      open={credito !== null}
+      onOpenChange={(abierto: boolean) => {
+        if (!abierto && !guardando) onCerrar()
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Intereses y cargos de {credito?.nombre}</DialogTitle>
+          <DialogDescription>
+            Lo que te cobraron de más: sube la deuda, pero no cuenta como gasto
+            ni como ingreso tuyo.
+          </DialogDescription>
+        </DialogHeader>
+        {credito ? (
+          <FormularioCargo
+            key={credito.id}
+            credito={credito}
+            guardando={guardando}
+            setGuardando={setGuardando}
+            onGuardado={onGuardado}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function FormularioCargo({
+  credito,
+  guardando,
+  setGuardando,
+  onGuardado,
+}: {
+  credito: Credito
+  guardando: boolean
+  setGuardando: (valor: boolean) => void
+  onGuardado: () => void
+}) {
+  const mensual = tasaMensual(credito.tasa_ea)
+  const estimado =
+    mensual && credito.saldo > 0 ? Math.round(credito.saldo * mensual) : null
+  const [tipo, setTipo] = React.useState<TipoCargo>("intereses")
+  const [valor, setValor] = React.useState<number | null>(estimado)
+  const [fecha, setFecha] = React.useState(hoyISO())
+  const [nota, setNota] = React.useState("")
+  const [error, setError] = React.useState<string | null>(null)
+
+  async function guardar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault()
+    if (!valor) return setError("Escribe cuánto te cobraron.")
+    setError(null)
+    setGuardando(true)
+    try {
+      await crearCargo(credito.id, { fecha, tipo, valor, nota: nota.trim() })
+      onGuardado()
+    } catch {
+      setError("No se pudo guardar. Inténtalo de nuevo.")
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const despues = credito.saldo + (valor ?? 0)
+  return (
+    <form onSubmit={guardar} noValidate className="flex flex-col gap-4">
+      <FieldGroup>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="cargo-tipo">Tipo</FieldLabel>
+            <Select
+              value={tipo}
+              onValueChange={(elegido: string | null) => {
+                if (elegido) setTipo(elegido as TipoCargo)
+              }}
+            >
+              <SelectTrigger id="cargo-tipo" className="w-full">
+                <SelectValue>
+                  {(v) => TIPOS_CARGO.find((t) => t.valor === v)?.etiqueta}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS_CARGO.map((t) => (
+                  <SelectItem key={t.valor} value={t.valor}>
+                    {t.etiqueta}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="cargo-fecha">Fecha</FieldLabel>
+            <Input
+              id="cargo-fecha"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
+          </Field>
+        </div>
+        <Field data-invalid={error ? true : undefined}>
+          <FieldLabel htmlFor="cargo-valor">Valor</FieldLabel>
+          <InputGroup>
+            <InputGroupAddon>
+              <InputGroupText>$</InputGroupText>
+            </InputGroupAddon>
+            <InputGroupInput
+              id="cargo-valor"
+              inputMode="numeric"
+              value={escribirValor(valor)}
+              onChange={(e) => {
+                const leido = leerValor(e.target.value)
+                if (leido === null || leido <= VALOR_MAX) setValor(leido)
+              }}
+              placeholder="0"
+              autoComplete="off"
+              aria-invalid={error ? true : undefined}
+              className="tabular-nums"
+            />
+          </InputGroup>
+          {error ? (
+            <FieldError>{error}</FieldError>
+          ) : (
+            <FieldDescription>
+              {estimado
+                ? `Con la tasa de ${Number(credito.tasa_ea).toLocaleString("es-CO")} % E.A., el interés del mes sería unos ${formatearPesos(estimado)}. Pon el que sale en el extracto.`
+                : "El que sale en el extracto o en la app. Registra la tasa del crédito (lápiz) para ver un estimado."}
+            </FieldDescription>
+          )}
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="cargo-nota">Nota (opcional)</FieldLabel>
+          <Input
+            id="cargo-nota"
+            value={nota}
+            maxLength={200}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder="Ej.: extracto de octubre"
+          />
+        </Field>
+      </FieldGroup>
+
+      <p className="rounded-lg bg-muted/50 p-3 text-sm tabular-nums">
+        La deuda pasa de {formatearPesos(credito.saldo)} a{" "}
+        <span className="font-semibold">{formatearPesos(despues)}</span>
+        {credito.cupo !== null
+          ? ` · cupo libre: ${formatearPesos(Math.max(0, credito.cupo - despues))}`
+          : ""}
+        .
+      </p>
+
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" disabled={guardando} />}>
+          Cancelar
+        </DialogClose>
+        <Button type="submit" disabled={guardando}>
+          {guardando ? <Spinner data-icon="inline-start" /> : null}
+          Anotar
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+/**
+ * Qué parte de cada pago se va en intereses y seguros. Se puede escribir el %
+ * o sacarlo de un extracto: pago total y lo que fue a capital.
+ */
+function CampoCosto({
+  valor,
+  onCambiar,
+  error,
+}: {
+  valor: string
+  onCambiar: (valor: string) => void
+  error?: string
+}) {
+  const [pago, setPago] = React.useState<number | null>(null)
+  const [capital, setCapital] = React.useState<number | null>(null)
+  const calculado =
+    pago && capital !== null && capital <= pago
+      ? Math.round(((pago - capital) / pago) * 10000) / 100
+      : null
+
+  return (
+    <Field data-invalid={error ? true : undefined} className="sm:col-span-2">
+      <FieldLabel htmlFor="credito-costo">
+        De cada pago, ¿cuánto se va en intereses y seguros?
+      </FieldLabel>
+      <InputGroup>
+        <InputGroupInput
+          id="credito-costo"
+          inputMode="decimal"
+          value={valor}
+          onChange={(e) => onCambiar(e.target.value)}
+          placeholder="Ej.: 64,2"
+          autoComplete="off"
+          aria-invalid={error ? true : undefined}
+          className="tabular-nums"
+        />
+        <InputGroupAddon align="inline-end">
+          <InputGroupText>%</InputGroupText>
+        </InputGroupAddon>
+      </InputGroup>
+      {error ? (
+        <FieldError>{error}</FieldError>
+      ) : (
+        <FieldDescription>
+          Con esto cada pago baja la deuda solo por su parte de capital. Vacío:
+          todo el pago va a capital.
+        </FieldDescription>
+      )}
+
+      <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3">
+        <p className="text-xs text-muted-foreground">
+          ¿No sabes el %? Sácalo de un extracto:
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <CampoCalculadora
+            id="calc-pago"
+            etiqueta="Pagaste en total"
+            valor={pago}
+            onCambiar={setPago}
+          />
+          <CampoCalculadora
+            id="calc-capital"
+            etiqueta="Fue a capital"
+            valor={capital}
+            onCambiar={setCapital}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="text-muted-foreground tabular-nums">
+            {calculado === null
+              ? "Intereses, seguros y demás = lo que no fue a capital."
+              : `${formatearPesos(pago! - capital!)} en intereses y seguros = ${calculado.toLocaleString("es-CO")} %`}
+          </span>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={calculado === null}
+            onClick={() =>
+              calculado !== null &&
+              onCambiar(String(calculado).replace(".", ","))
+            }
+          >
+            Usar este %
+          </Button>
+        </div>
+      </div>
+    </Field>
+  )
+}
+
+function CampoCalculadora({
+  id,
+  etiqueta,
+  valor,
+  onCambiar,
+}: {
+  id: string
+  etiqueta: string
+  valor: number | null
+  onCambiar: (valor: number | null) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-xs">
+        {etiqueta}
+      </label>
+      <InputGroup className="h-8">
+        <InputGroupAddon>
+          <InputGroupText>$</InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
+          id={id}
+          inputMode="numeric"
+          value={escribirValor(valor)}
+          onChange={(e) => {
+            const leido = leerValor(e.target.value)
+            if (leido === null || leido <= VALOR_MAX) onCambiar(leido)
+          }}
+          placeholder="0"
+          autoComplete="off"
+          className="tabular-nums"
+        />
+      </InputGroup>
+    </div>
+  )
+}
+
+/** Pendientes, ya pagados o todo: aplica a créditos y gastos fijos. */
+function FiltroVista({
+  vista,
+  onCambiar,
+}: {
+  vista: Vista
+  onCambiar: (vista: Vista) => void
+}) {
+  return (
+    <div
+      id="lista-creditos"
+      className="flex scroll-mt-20 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
+        Tus créditos
+      </h2>
+      <ToggleGroup
+        variant="outline"
+        size="sm"
+        spacing={0}
+        value={[vista]}
+        onValueChange={(valores: string[]) => {
+          if (valores[0]) onCambiar(valores[0] as Vista)
+        }}
+        aria-label="Qué mostrar"
+        className="w-full sm:w-fit"
+      >
+        {VISTAS.map((v) => (
+          <ToggleGroupItem
+            key={v.valor}
+            value={v.valor}
+            className="flex-1 sm:flex-none"
+          >
+            {v.etiqueta}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
   )
 }

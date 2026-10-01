@@ -19,9 +19,10 @@ function marcaDeTiempo() {
 }
 
 /**
- * Baja todo lo de finanzas (movimientos, créditos, sugerencias y avisos) en
- * un JSON. Es el mismo archivo que hace `backup/json/backup_movimientos.py`
- * y se restaura con `manage.py loaddata`.
+ * Baja todo lo de finanzas (movimientos, créditos con sus intereses, gastos
+ * fijos, salario, sugerencias y avisos) en un JSON. Es el mismo archivo que
+ * hace `backup/json/backup_movimientos.py` y se restaura con
+ * `manage.py loaddata`.
  */
 export function BotonExportar() {
   const [estado, setEstado] = React.useState<"listo" | "bajando" | "fallo">(
@@ -55,7 +56,7 @@ export function BotonExportar() {
       title={
         estado === "fallo"
           ? "No se pudo exportar. Vuelve a intentarlo."
-          : "Movimientos, créditos y sugerencias en un archivo JSON"
+          : "Movimientos, créditos, gastos fijos, salario y sugerencias en un archivo JSON"
       }
       aria-label="Exportar datos en JSON"
     >

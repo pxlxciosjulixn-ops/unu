@@ -1,6 +1,10 @@
 """
 Respaldo de todo lo de finanzas en JSON, en el formato de Django.
 
+Lleva movimientos, sugerencias (con grupo y tope), créditos, intereses y
+cargos de los créditos, gastos fijos, el salario, los avisos enviados y (solo
+en el script) los ajustes de diseño.
+
 Lo usan el script `backup/json/backup_movimientos.py` y el botón "Exportar
 JSON" del dashboard, así que los dos archivos salen iguales y se restauran
 igual:
@@ -20,7 +24,16 @@ from typing import IO
 from django.core import serializers
 from django.utils import timezone
 
-from finanzas.models import AjusteVisual, AvisoEnviado, Credito, Movimiento, Sugerencia
+from finanzas.models import (
+    AjusteVisual,
+    AvisoEnviado,
+    CargoCredito,
+    ConfiguracionFinanzas,
+    Credito,
+    GastoFijo,
+    Movimiento,
+    Sugerencia,
+)
 
 
 def consultas(con_ajustes: bool = True) -> dict[str, object]:
@@ -33,6 +46,9 @@ def consultas(con_ajustes: bool = True) -> dict[str, object]:
     partes = {
         "sugerencias": Sugerencia.objects.order_by("id"),
         "creditos": Credito.objects.order_by("id"),
+        "cargos": CargoCredito.objects.order_by("id"),
+        "gastos_fijos": GastoFijo.objects.order_by("id"),
+        "configuracion": ConfiguracionFinanzas.objects.order_by("id"),
         "movimientos": Movimiento.objects.order_by("fecha", "id"),
         "avisos": AvisoEnviado.objects.order_by("id"),
     }

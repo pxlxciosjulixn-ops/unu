@@ -174,6 +174,73 @@ def credito(request: Request, pk: int) -> Response:
     return Response(serializador.data)
 
 
+@api_view(["GET", "POST"])
+@throttle_classes([FinanzasThrottle])
+def gastos_fijos(request: Request) -> Response:
+    """
+    GET: los gastos fijos con lo que se debe este mes.
+    POST: registra uno (Mamá, arriendo…).
+    """
+    if request.method == "GET":
+        return Response(
+            serializers.GastoFijoSerializer(models.GastoFijo.objects.all(), many=True).data
+        )
+    serializador = serializers.GastoFijoSerializer(data=request.data)
+    serializador.is_valid(raise_exception=True)
+    serializador.save()
+    return Response(serializador.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PUT", "PATCH", "DELETE"])
+@throttle_classes([FinanzasThrottle])
+def gasto_fijo(request: Request, pk: int) -> Response:
+    """Corrige un gasto fijo o lo quita; los movimientos no se tocan."""
+    fila = get_object_or_404(models.GastoFijo, pk=pk)
+    if request.method == "DELETE":
+        fila.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    serializador = serializers.GastoFijoSerializer(
+        fila, data=request.data, partial=request.method == "PATCH"
+    )
+    serializador.is_valid(raise_exception=True)
+    serializador.save()
+    return Response(serializador.data)
+
+
+@api_view(["POST"])
+@throttle_classes([FinanzasThrottle])
+def cargos(request: Request, pk: int) -> Response:
+    """Anota intereses u otro cargo en un crédito: sube su saldo."""
+    fila = get_object_or_404(models.Credito, pk=pk)
+    serializador = serializers.CargoCreditoSerializer(data=request.data)
+    serializador.is_valid(raise_exception=True)
+    serializador.save(credito=fila)
+    return Response(serializador.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["DELETE"])
+@throttle_classes([FinanzasThrottle])
+def cargo(request: Request, pk: int) -> Response:
+    """Quita un cargo mal anotado."""
+    get_object_or_404(models.CargoCredito, pk=pk).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET", "PUT"])
+@throttle_classes([FinanzasThrottle])
+def configuracion(request: Request) -> Response:
+    """El salario con que se simula cuánto queda el mes siguiente."""
+    fila = models.ConfiguracionFinanzas.actual()
+    if request.method == "GET":
+        return Response(serializers.ConfiguracionFinanzasSerializer(fila).data)
+    serializador = serializers.ConfiguracionFinanzasSerializer(
+        fila, data=request.data, partial=True
+    )
+    serializador.is_valid(raise_exception=True)
+    serializador.save()
+    return Response(serializador.data)
+
+
 @api_view(["GET", "PUT"])
 @throttle_classes([FinanzasThrottle])
 def ajustes(request: Request) -> Response:

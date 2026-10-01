@@ -17,8 +17,9 @@ import {
   type NuevoMovimiento,
   type Tipo,
 } from "@/components/finanzas/finanzas"
-import { AvisoCredito } from "@/components/finanzas/aviso-credito"
+import { AvisoCredito, AvisoFijo } from "@/components/finanzas/aviso-credito"
 import { RUTA_API_CREDITOS, type Credito } from "@/components/finanzas/creditos"
+import { RUTA_API_FIJOS, type GastoFijo } from "@/components/finanzas/fijos"
 import { FinanzasShell } from "@/components/finanzas/finanzas-shell"
 import { useSugerencias } from "@/components/finanzas/use-sugerencias"
 import {
@@ -87,6 +88,8 @@ export function FormularioGastosPage() {
   // Para avisar cuánto queda debiendo si el concepto es un crédito.
   const { data: creditos, recargar: recargarCreditos } =
     useApi<Credito[]>(RUTA_API_CREDITOS)
+  const { data: fijos, recargar: recargarFijos } =
+    useApi<GastoFijo[]>(RUTA_API_FIJOS)
   const [fecha, setFecha] = React.useState(hoyISO)
   const [tipo, setTipo] = React.useState<Tipo>("gasto")
   const [concepto, setConcepto] = React.useState("")
@@ -127,6 +130,7 @@ export function FormularioGastosPage() {
       const nuevo = await crearMovimiento(preview)
       setGuardado(nuevo)
       recargarCreditos()
+      recargarFijos()
       setConcepto("")
       setValor(null)
       setPreview(null)
@@ -280,6 +284,13 @@ export function FormularioGastosPage() {
                   valor={valor}
                   fecha={fecha}
                   creditos={creditos}
+                />
+                <AvisoFijo
+                  concepto={homogenizarConcepto(concepto, sugerencias)}
+                  tipo={tipo}
+                  valor={valor}
+                  fecha={fecha}
+                  fijos={fijos}
                 />
               </FieldGroup>
             </CardContent>

@@ -36,7 +36,7 @@ export function TarjetasConcepto({
 }) {
   if (!comparacion) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-32 w-full rounded-xl" />
         ))}
@@ -52,13 +52,13 @@ export function TarjetasConcepto({
     : null
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       <Card>
         <CardHeader>
           <CardDescription className="truncate" title={concepto}>
             {esIngreso ? "Entró por" : "Se fue en"} {concepto}
           </CardDescription>
-          <CardTitle className="text-2xl break-all tabular-nums">
+          <CardTitle className="text-lg break-all tabular-nums sm:text-2xl">
             {formatearPesos(total)}
           </CardTitle>
         </CardHeader>

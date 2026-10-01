@@ -192,6 +192,17 @@ class Credito(models.Model):
         blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(1000)],
     )
+    # Qué parte de cada pago se va en intereses, seguros y demás costos (sale
+    # del extracto: pago total contra abono a capital). Con ella cada abono
+    # baja la deuda solo por su parte de capital. Vacía: todo va a capital.
+    costo_pct = models.DecimalField(
+        "% de cada pago en intereses y seguros",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
     # Lo que se paga al mes, para calcular cuánto falta.
     cuota = models.BigIntegerField(
         "cuota mensual",
@@ -223,3 +234,110 @@ class Credito(models.Model):
 
     def __str__(self) -> str:
         return self.nombre
+
+
+class CargoCredito(models.Model):
+    """
+    Lo que la entidad le suma a la deuda sin que entre plata: intereses,
+    cuota de manejo, seguro, mora.
+
+    No es un movimiento: no es un gasto (no salió de la billetera) ni un
+    ingreso (no entró nada). Solo sube el saldo del crédito.
+    """
+
+    class Tipo(models.TextChoices):
+        INTERESES = "intereses", "Intereses"
+        MANEJO = "manejo", "Cuota de manejo"
+        SEGURO = "seguro", "Seguro"
+        MORA = "mora", "Intereses de mora"
+        OTRO = "otro", "Otro cargo"
+
+    credito = models.ForeignKey(
+        Credito, on_delete=models.CASCADE, related_name="cargos", verbose_name="crédito"
+    )
+    fecha = models.DateField("fecha")
+    tipo = models.CharField("tipo", max_length=16, choices=Tipo.choices, default=Tipo.INTERESES)
+    valor = models.BigIntegerField(
+        "valor", validators=[MinValueValidator(1), MaxValueValidator(VALOR_MAX)]
+    )
+    nota = models.CharField("nota", max_length=200, blank=True)
+    created_at = models.DateTimeField("creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["fecha", "id"]
+        verbose_name = "cargo de crédito"
+        verbose_name_plural = "cargos de créditos"
+
+    def __str__(self) -> str:
+        return f"{self.credito} · {self.get_tipo_display()} · {self.valor}"
+
+
+class GastoFijo(models.Model):
+    """
+    Un pago de todos los meses (lo de Mamá, el arriendo…).
+
+    Se lleva por concepto, igual que los créditos: un gasto con ese concepto
+    es un pago y un ingreso es un préstamo de esa persona, que se suma a lo
+    que se le debe ese mes. Las cuentas están en `finanzas/fijos.py`.
+    """
+
+    nombre = models.CharField("nombre", max_length=CONCEPTO_MAX)
+    clave = models.CharField(
+        "clave", max_length=CONCEPTO_MAX, unique=True, editable=False
+    )
+    monto = models.BigIntegerField(
+        "monto mensual", validators=[MinValueValidator(1), MaxValueValidator(VALOR_MAX)]
+    )
+    # Hasta qué día del mes hay plazo; vacío si no hay día fijo.
+    dia_pago = models.PositiveSmallIntegerField(
+        "día de pago",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+    )
+    # El primer mes que cuenta: los pagos de antes no entran.
+    fecha_inicio = models.DateField("desde")
+    # El último mes en que se debe; vacío es para siempre. Igual a
+    # `fecha_inicio` para algo de una sola vez (el préstamo de un amigo).
+    fecha_fin = models.DateField("hasta", null=True, blank=True)
+    created_at = models.DateTimeField("creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "gasto fijo"
+        verbose_name_plural = "gastos fijos"
+
+    def save(self, *args, **kwargs):
+        self.nombre = " ".join(self.nombre.split())
+        self.clave = clave_de_concepto(self.nombre)
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.nombre} · {self.monto}"
+
+
+class ConfiguracionFinanzas(models.Model):
+    """
+    Datos sueltos de la persona, una sola fila: por ahora el salario, que es
+    con lo que se simula cuánto queda el mes siguiente.
+    """
+
+    salario = models.BigIntegerField(
+        "salario mensual",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(VALOR_MAX)],
+    )
+    updated_at = models.DateTimeField("actualizado", auto_now=True)
+
+    class Meta:
+        verbose_name = "configuración de finanzas"
+        verbose_name_plural = "configuración de finanzas"
+
+    @classmethod
+    def actual(cls) -> "ConfiguracionFinanzas":
+        fila, _ = cls.objects.get_or_create(pk=1)
+        return fila
+
+    def __str__(self) -> str:
+        return f"Salario {self.salario}"

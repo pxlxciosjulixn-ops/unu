@@ -34,7 +34,7 @@ export function TarjetasResumen({
 }) {
   if (!actual) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-32 w-full rounded-xl" />
         ))}
@@ -43,7 +43,7 @@ export function TarjetasResumen({
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       <TarjetaPesos
         titulo="Ingresos"
         valor={actual.ingresos}
@@ -70,7 +70,7 @@ export function TarjetasResumen({
       <Card>
         <CardHeader>
           <CardDescription>Ahorro</CardDescription>
-          <CardTitle className="text-2xl tabular-nums">
+          <CardTitle className="text-lg tabular-nums sm:text-2xl">
             {actual.ahorroPct === null
               ? "—"
               : formatearPorcentaje(actual.ahorroPct, 1)}
@@ -118,7 +118,7 @@ function TarjetaPesos({
     <Card>
       <CardHeader>
         <CardDescription>{titulo}</CardDescription>
-        <CardTitle className="text-2xl break-all tabular-nums">
+        <CardTitle className="text-lg break-all tabular-nums sm:text-2xl">
           {conSigno && valor > 0 ? "+" : ""}
           {formatearPesos(valor)}
         </CardTitle>

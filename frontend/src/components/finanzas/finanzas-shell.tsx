@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeftRightIcon,
   BotIcon,
+  CalculatorIcon,
   CalendarDaysIcon,
   CalendarRangeIcon,
   ChartColumnStackedIcon,
@@ -66,7 +67,7 @@ const PAGINAS: Pagina[] = [
     icon: PencilLineIcon,
   },
   {
-    titulo: "Créditos",
+    titulo: "Créditos y gastos fijos",
     to: RUTAS_FINANZAS.creditos,
     icon: CreditCardIcon,
   },
@@ -104,6 +105,13 @@ const SECCIONES: Record<string, Ancla[]> = {
     },
     { titulo: "Comparar meses", hash: "#comparar", icon: ArrowLeftRightIcon },
     { titulo: "Movimientos", hash: "#movimientos", icon: ListIcon },
+  ],
+  [RUTAS_FINANZAS.creditos]: [
+    { titulo: "Resumen", hash: "#resumen-creditos", icon: GaugeIcon },
+    { titulo: "¿Cuánto me queda?", hash: "#simulacion", icon: CalculatorIcon },
+    { titulo: "Asesor financiero", hash: "#asesor", icon: BotIcon },
+    { titulo: "Tus créditos", hash: "#lista-creditos", icon: CreditCardIcon },
+    { titulo: "Gastos fijos", hash: "#fijos", icon: RepeatIcon },
   ],
   [RUTAS_FINANZAS.editar]: [
     { titulo: "Movimientos", hash: "#movimientos", icon: ListIcon },

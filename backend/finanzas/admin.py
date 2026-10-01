@@ -34,3 +34,19 @@ class AjusteVisualAdmin(admin.ModelAdmin):
 @admin.register(models.Credito)
 class CreditoAdmin(admin.ModelAdmin):
     list_display = ["nombre", "saldo_inicial", "fecha_inicio", "cupo", "cuota"]
+
+
+@admin.register(models.CargoCredito)
+class CargoCreditoAdmin(admin.ModelAdmin):
+    list_display = ["credito", "fecha", "tipo", "valor", "nota"]
+    list_filter = ["tipo", "credito"]
+
+
+@admin.register(models.GastoFijo)
+class GastoFijoAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "monto", "dia_pago", "fecha_inicio", "fecha_fin"]
+
+
+@admin.register(models.ConfiguracionFinanzas)
+class ConfiguracionFinanzasAdmin(admin.ModelAdmin):
+    list_display = ["salario", "updated_at"]

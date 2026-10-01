@@ -63,24 +63,26 @@ const ASISTENTES = {
     placeholder: "Pregunta sobre tus finanzas…",
     pensando: "Revisando tus números…",
     maxCaracteres: 200,
-    alto: "h-72",
+    alto: "h-60 sm:h-72",
   },
   creditos: {
     id: "asesor",
-    titulo: "Asesor de créditos",
+    titulo: "Asesor financiero",
     descripcion:
-      "Experto en deudas: compra de cartera, qué pagar primero y cómo salir más rápido",
-    intro: "Conoce tus créditos, tasas y cuotas. Prueba con:",
+      "Pregúntale lo que quieras de tu plata: deudas, gastos, ahorro y cómo abonar más a capital",
+    intro:
+      "Conoce tus créditos, gastos fijos y en qué se te va la plata. Prueba con:",
     sugerencias: [
+      "¿En qué estoy gastando de más?",
+      "¿De dónde saco plata para abonar más a capital?",
       "¿Qué crédito debería pagar primero?",
-      "¿Me conviene una compra de cartera?",
       "Arma un plan para salir de deudas en un año",
-      "¿Cuánto me cuestan los avances de Solventa y LuckyPlata?",
+      "¿Me conviene una compra de cartera?",
     ],
-    placeholder: "Pregunta sobre tus créditos y deudas…",
-    pensando: "Revisando tus créditos…",
-    maxCaracteres: 600,
-    alto: "h-96",
+    placeholder: "Pregunta lo que quieras de tu plata…",
+    pensando: "Revisando tus finanzas…",
+    maxCaracteres: 800,
+    alto: "h-72 sm:h-96",
   },
 } as const
 
@@ -201,7 +203,7 @@ export function AsistenteFinanzas({
         ) : null}
       </CardHeader>
 
-      <CardContent className="flex min-h-72 flex-1 flex-col">
+      <CardContent className="flex min-h-60 flex-1 flex-col sm:min-h-72">
         <MessageScrollerProvider autoScroll>
           <MessageScroller
             className={cn(
