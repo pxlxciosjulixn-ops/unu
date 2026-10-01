@@ -20,11 +20,17 @@ export function TarjetasResumen({
   actual,
   anterior,
   comparacion,
+  promedio = null,
 }: {
   actual: Totales | null
   /** Totales del tramo anterior; null si el periodo no tiene con qué comparar. */
   anterior: Totales | null
   comparacion: string | null
+  /**
+   * Promedio mensual de los últimos meses cerrados. Solo tiene sentido cuando
+   * se mira un mes: un mes contra el anterior engaña si ese fue raro.
+   */
+  promedio?: Totales | null
 }) {
   if (!actual) {
     return (
@@ -43,12 +49,14 @@ export function TarjetasResumen({
         valor={actual.ingresos}
         cambio={variacion(actual.ingresos, anterior?.ingresos)}
         comparacion={comparacion}
+        promedio={promedio?.ingresos}
       />
       <TarjetaPesos
         titulo="Gastos"
         valor={actual.gastos}
         cambio={variacion(actual.gastos, anterior?.gastos)}
         comparacion={comparacion}
+        promedio={promedio?.gastos}
       />
       <TarjetaPesos
         titulo="Balance"
@@ -56,6 +64,7 @@ export function TarjetasResumen({
         conSigno
         cambio={variacion(actual.balance, anterior?.balance)}
         comparacion={comparacion}
+        promedio={promedio?.balance}
       />
 
       <Card>
@@ -73,12 +82,17 @@ export function TarjetasResumen({
             aria-label="Parte del ingreso que quedó sin gastar"
           />
         </CardContent>
-        <CardFooter className="text-xs text-muted-foreground">
+        <CardFooter className="flex flex-col items-start gap-1 text-xs text-muted-foreground">
           {actual.ahorroPct === null
             ? "Sin ingresos en el periodo"
             : actual.ahorroPct < 0
               ? "Se gastó más de lo que entró"
               : "De lo que entró, quedó libre"}
+          {promedio && promedio.ahorroPct !== null ? (
+            <span className="tabular-nums">
+              Promedio 3 meses: {formatearPorcentaje(promedio.ahorroPct, 1)}
+            </span>
+          ) : null}
         </CardFooter>
       </Card>
     </div>
@@ -91,12 +105,14 @@ function TarjetaPesos({
   conSigno = false,
   cambio,
   comparacion,
+  promedio,
 }: {
   titulo: string
   valor: number
   conSigno?: boolean
   cambio: number | null
   comparacion: string | null
+  promedio?: number
 }) {
   return (
     <Card>
@@ -107,8 +123,14 @@ function TarjetaPesos({
           {formatearPesos(valor)}
         </CardTitle>
       </CardHeader>
-      <CardFooter className="mt-auto">
+      <CardFooter className="mt-auto flex flex-col items-start gap-1">
         <Variacion cambio={cambio} comparacion={comparacion} />
+        {promedio !== undefined ? (
+          <span className="text-xs text-muted-foreground tabular-nums">
+            Promedio 3 meses: {conSigno && promedio > 0 ? "+" : ""}
+            {formatearPesos(promedio)}
+          </span>
+        ) : null}
       </CardFooter>
     </Card>
   )

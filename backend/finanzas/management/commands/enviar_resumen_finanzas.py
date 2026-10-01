@@ -18,7 +18,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from finanzas import gmail
-from finanzas.avisos import correo_resumen
+from finanzas.avisos import correo_resumen, extras_resumen
 from finanzas.calculos import mes_anterior, resumen_mes
 from finanzas.models import AvisoEnviado
 
@@ -41,7 +41,11 @@ class Command(BaseCommand):
         else:
             elegido = mes_anterior(timezone.localdate())
 
-        asunto, texto, html = correo_resumen(resumen_mes(elegido), resumen_mes(mes_anterior(elegido)))
+        asunto, texto, html = correo_resumen(
+            resumen_mes(elegido, top=50),
+            resumen_mes(mes_anterior(elegido), top=50),
+            extras_resumen(elegido),
+        )
         if ver:
             self.stdout.write(html)
             return

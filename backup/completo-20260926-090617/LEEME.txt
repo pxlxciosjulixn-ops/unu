@@ -1,0 +1,42 @@
+BACKUP COMPLETO DE UNU - 26/09/2026 09:06
+=========================================
+
+Contenido
+---------
+codigo.zip         Todo el codigo del repo (commit 0eee603), 284 archivos.
+                   Sin node_modules, sin el venv y sin la carpeta backup.
+datos.json         Toda la base de produccion (Postgres de Render), 7.952
+                   registros: hoja de vida, chats y analisis del consejero,
+                   finanzas, dashboard y el usuario admin.
+config/            Los .env que no estan en git (llaves de OpenAI, NVIDIA,
+                   Gmail, DATABASE_URL, claves del consejero).
+db.sqlite3-local   La base SQLite local de desarrollo, tal cual.
+
+OJO: config/ tiene las llaves y la URL de la base. El .gitignore de la raiz
+del repo la deja por fuera (backup/**/config/): nunca se sube a GitHub.
+
+
+Restaurar el codigo
+-------------------
+1. Descomprimir codigo.zip en una carpeta nueva.
+2. Copiar config/backend__.env         -> backend/.env
+          config/frontend__.env.local  -> frontend/.env.local
+          config/frontend__.env.production -> frontend/.env.production
+3. Backend:  cd backend
+             python -m venv env
+             env\Scripts\pip install -r requirements.txt
+4. Frontend: cd frontend
+             npm install
+
+
+Restaurar los datos
+-------------------
+Con backend/.env apuntando a la base donde se quiere restaurar:
+
+    cd backend
+    env\Scripts\python manage.py migrate
+    env\Scripts\python manage.py loaddata ruta\a\datos.json
+
+loaddata escribe con los mismos id: reemplaza los registros que ya existan
+con ese id y agrega los que falten. En una base vacia deja todo igual que en
+el momento del backup.

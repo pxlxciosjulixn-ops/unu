@@ -1,0 +1,3 @@
+# Los .env copiados en los backups llevan las llaves de OpenAI, NVIDIA, Gmail
+# y la URL de la base: nunca se suben, aunque el resto del backup sí.
+backup/**/config/

@@ -17,6 +17,8 @@ import {
   type NuevoMovimiento,
   type Tipo,
 } from "@/components/finanzas/finanzas"
+import { AvisoCredito } from "@/components/finanzas/aviso-credito"
+import { RUTA_API_CREDITOS, type Credito } from "@/components/finanzas/creditos"
 import { FinanzasShell } from "@/components/finanzas/finanzas-shell"
 import { useSugerencias } from "@/components/finanzas/use-sugerencias"
 import {
@@ -68,6 +70,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { useApi } from "@/hooks/use-api"
 import { formatearPesos } from "@/lib/format"
 
 /**
@@ -81,6 +84,9 @@ import { formatearPesos } from "@/lib/format"
  */
 export function FormularioGastosPage() {
   const { nombres: sugerencias } = useSugerencias()
+  // Para avisar cuánto queda debiendo si el concepto es un crédito.
+  const { data: creditos, recargar: recargarCreditos } =
+    useApi<Credito[]>(RUTA_API_CREDITOS)
   const [fecha, setFecha] = React.useState(hoyISO)
   const [tipo, setTipo] = React.useState<Tipo>("gasto")
   const [concepto, setConcepto] = React.useState("")
@@ -120,6 +126,7 @@ export function FormularioGastosPage() {
     try {
       const nuevo = await crearMovimiento(preview)
       setGuardado(nuevo)
+      recargarCreditos()
       setConcepto("")
       setValor(null)
       setPreview(null)
@@ -266,6 +273,14 @@ export function FormularioGastosPage() {
                     </FieldDescription>
                   )}
                 </Field>
+
+                <AvisoCredito
+                  concepto={homogenizarConcepto(concepto, sugerencias)}
+                  tipo={tipo}
+                  valor={valor}
+                  fecha={fecha}
+                  creditos={creditos}
+                />
               </FieldGroup>
             </CardContent>
 

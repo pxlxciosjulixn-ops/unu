@@ -26,11 +26,13 @@ from django.conf import settings
 from django.db import IntegrityError, close_old_connections, transaction
 from django.utils import timezone
 
-from finanzas import gmail
+from finanzas import analisis, gmail
 from finanzas.calculos import (
     ResumenMes,
     formato_pesos,
     mes_anterior,
+    mes_siguiente,
+    nombre_mes,
     primer_dia,
     resumen_mes,
 )
@@ -112,7 +114,13 @@ def revisar_resumen_pendiente(hoy: date | None = None) -> bool:
     if not _reservar(tipo, mes):
         return False
     _enviar_en_hilo(
-        tipo, mes, lambda: correo_resumen(resumen_mes(mes), resumen_mes(mes_anterior(mes)))
+        tipo,
+        mes,
+        lambda: correo_resumen(
+            resumen_mes(mes, top=50),
+            resumen_mes(mes_anterior(mes), top=50),
+            extras_resumen(mes),
+        ),
     )
     return True
 
@@ -212,7 +220,31 @@ def correo_sobregasto(resumen: ResumenMes) -> tuple[str, str, str]:
     )
 
 
-def correo_resumen(resumen: ResumenMes, anterior: ResumenMes) -> tuple[str, str, str]:
+def subidas(resumen: ResumenMes, anterior: ResumenMes, n: int = 3) -> list[tuple[str, int, int]]:
+    """Los conceptos de gasto que más subieron: (nombre, ahora, antes)."""
+    antes = {c.nombre: c.total for c in anterior.conceptos_gasto}
+    filas = [
+        (c.nombre, c.total, antes.get(c.nombre, 0))
+        for c in resumen.conceptos_gasto
+        if c.total > antes.get(c.nombre, 0)
+    ]
+    filas.sort(key=lambda f: f[2] - f[1])
+    return filas[:n]
+
+
+def extras_resumen(mes: date) -> dict:
+    """Lo que va en el resumen además de las cifras: topes y el mes que viene."""
+    siguiente = mes_siguiente(mes)
+    return {
+        "siguiente": siguiente,
+        "esperado": analisis.estimar_mes(siguiente),
+        "topes_pasados": [e for e in analisis.presupuestos(mes) if e.pct > 100],
+    }
+
+
+def correo_resumen(
+    resumen: ResumenMes, anterior: ResumenMes, extras: dict | None = None
+) -> tuple[str, str, str]:
     signo = "+" if resumen.balance > 0 else ""
     asunto = f"Resumen de {resumen.nombre}: {signo}{formato_pesos(resumen.balance)}"
     titulo = f"Así cerró {resumen.nombre}"
@@ -237,6 +269,26 @@ def correo_resumen(resumen: ResumenMes, anterior: ResumenMes) -> tuple[str, str,
     ]
     if cambio:
         datos.append((f"Gastos vs. {anterior.nombre}", cambio, False))
+    # Sin movimientos el mes anterior, todo "subiría": no dice nada.
+    if anterior.movimientos:
+        for nombre, ahora, antes in subidas(resumen, anterior):
+            datos.append(
+                (f"Subió: {nombre}", f"+{formato_pesos(ahora - antes)}", False)
+            )
+    if extras:
+        for e in extras["topes_pasados"]:
+            datos.append(
+                (f"Pasó el tope: {e.concepto}", f"{e.pct:.0f} % de {formato_pesos(e.tope)}", False)
+            )
+        if extras["esperado"]:
+            ingresos, gastos = extras["esperado"]
+            nombre = nombre_mes(extras["siguiente"])
+            if ingresos:
+                datos.append((f"Ingresos esperados en {nombre}", formato_pesos(ingresos), False))
+            datos.append((f"Gastos esperados en {nombre}", formato_pesos(gastos), False))
+    # El correo muestra los 5 conceptos más grandes; para las subidas se
+    # pidieron todos.
+    resumen.conceptos_gasto = resumen.conceptos_gasto[:5]
     return (
         asunto,
         _texto(titulo, intro, [f"{e}: {v}" for e, v, _ in datos], resumen),

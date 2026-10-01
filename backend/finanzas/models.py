@@ -60,9 +60,31 @@ class Sugerencia(models.Model):
     o se borre en la pagina de edicion es lo que se sugiere y lo que homogeniza.
     """
 
+    class Grupo(models.TextChoices):
+        DEUDA = "deuda", "Deudas"
+        FAMILIA = "familia", "Familia"
+        COMIDA = "comida", "Comida"
+        TRANSPORTE = "transporte", "Transporte"
+        MASCOTAS = "mascotas", "Mascotas"
+        HOGAR = "hogar", "Hogar y servicios"
+        GUSTOS = "gustos", "Gustos y salidas"
+        OTRO = "otro", "Otros"
+
     nombre = models.CharField("nombre", max_length=CONCEPTO_MAX)
     clave = models.CharField(
         "clave", max_length=CONCEPTO_MAX, unique=True, editable=False
+    )
+    # Para juntar conceptos en el dashboard (cuánto se va en deudas, en la
+    # familia...). Lo que no tenga sugerencia cuenta como "otro".
+    grupo = models.CharField(
+        "grupo", max_length=16, choices=Grupo.choices, default=Grupo.OTRO
+    )
+    # Tope de gasto al mes; vacío es sin presupuesto.
+    presupuesto = models.BigIntegerField(
+        "presupuesto mensual",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(VALOR_MAX)],
     )
     created_at = models.DateTimeField("creado", auto_now_add=True)
 
@@ -108,3 +130,86 @@ class AvisoEnviado(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_tipo_display()} · {self.mes:%Y-%m}"
+
+
+class AjusteVisual(models.Model):
+    """
+    Como se ve el dashboard para quien entra desde una IP: estilo, tema, color
+    de acento y letra.
+
+    Va en la base y no solo en el navegador para que al abrir las paginas en
+    otro equipo de la misma red salga el mismo diseño. La IP no se guarda: la
+    llave es su hash con sal (`chat.services.hash_visitante`).
+    """
+
+    visitante = models.CharField("visitante", max_length=64, unique=True)
+    datos = models.JSONField("datos", default=dict)
+    updated_at = models.DateTimeField("actualizado", auto_now=True)
+
+    class Meta:
+        verbose_name = "ajuste visual"
+        verbose_name_plural = "ajustes visuales"
+
+    def __str__(self) -> str:
+        return f"{self.visitante[:10]}… · {self.updated_at:%Y-%m-%d}"
+
+
+class Credito(models.Model):
+    """
+    Un crédito (Nu, Addi, Mt15, Solventa, LuckyPlata…) y cuánto se debe.
+
+    El saldo no se guarda: sale de los movimientos con el mismo concepto desde
+    `fecha_inicio`. Un gasto con ese concepto es un abono y baja la deuda; un
+    ingreso es un avance (plata que se sacó del crédito) y la sube. Así no hay
+    que anotar nada dos veces: basta registrar el movimiento como siempre.
+    """
+
+    nombre = models.CharField("nombre", max_length=CONCEPTO_MAX)
+    clave = models.CharField(
+        "clave", max_length=CONCEPTO_MAX, unique=True, editable=False
+    )
+    saldo_inicial = models.BigIntegerField(
+        "saldo al empezar",
+        validators=[MinValueValidator(0), MaxValueValidator(VALOR_MAX)],
+    )
+    # Los movimientos de este día en adelante mueven el saldo; los de antes
+    # ya están dentro de `saldo_inicial`.
+    fecha_inicio = models.DateField("desde")
+    # Hasta cuánto presta (tarjeta, cupo de avances); vacío si no aplica.
+    cupo = models.BigIntegerField(
+        "cupo",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(VALOR_MAX)],
+    )
+    # Lo que se paga al mes, para calcular cuánto falta.
+    cuota = models.BigIntegerField(
+        "cuota mensual",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(VALOR_MAX)],
+    )
+    created_at = models.DateTimeField("creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "crédito"
+        verbose_name_plural = "créditos"
+
+    def save(self, *args, **kwargs):
+        self.nombre = " ".join(self.nombre.split())
+        self.clave = clave_de_concepto(self.nombre)
+        return super().save(*args, **kwargs)
+
+    def movimientos(self):
+        """Los movimientos que mueven el saldo, del más viejo al más nuevo."""
+        return [
+            m
+            for m in Movimiento.objects.filter(fecha__gte=self.fecha_inicio).order_by(
+                "fecha", "id"
+            )
+            if clave_de_concepto(m.concepto) == self.clave
+        ]
+
+    def __str__(self) -> str:
+        return self.nombre

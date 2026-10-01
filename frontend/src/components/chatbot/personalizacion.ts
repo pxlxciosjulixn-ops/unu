@@ -290,7 +290,10 @@ export const LETRA_DEL_ESTILO: Record<Estilo, string> = {
 }
 
 /** La letra que de verdad se usa: "auto" depende del estilo. */
-export function letraEfectiva({ letra, estilo }: Personalizacion) {
+export function letraEfectiva({
+  letra,
+  estilo,
+}: Pick<Personalizacion, "letra" | "estilo">) {
   return letra === "auto" || !LETRAS[letra] ? LETRA_DEL_ESTILO[estilo] : letra
 }
 

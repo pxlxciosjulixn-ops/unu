@@ -8,12 +8,20 @@ import {
   XIcon,
 } from "lucide-react"
 
+import { promedioConcepto } from "@/components/finanzas/analisis"
 import {
+  actualizarSugerencia,
   claveConcepto,
   CONCEPTO_MAX,
   crearSugerencia,
   eliminarSugerencia,
+  escribirValor,
+  GRUPOS,
+  leerValor,
   renombrarSugerencia,
+  VALOR_MAX,
+  type Grupo,
+  type Movimiento,
   type Sugerencia,
 } from "@/components/finanzas/finanzas"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -32,6 +40,18 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 
@@ -45,9 +65,12 @@ import { Spinner } from "@/components/ui/spinner"
  */
 export function PanelSugerencias({
   sugerencias,
+  movimientos,
   onCambio,
 }: {
   sugerencias: Sugerencia[] | null
+  /** Para sugerir el tope con lo que se suele gastar. */
+  movimientos: Movimiento[] | null
   onCambio: () => void
 }) {
   const [nueva, setNueva] = React.useState("")
@@ -115,6 +138,22 @@ export function PanelSugerencias({
     }
   }
 
+  async function ajustar(
+    sugerencia: Sugerencia,
+    cambios: { grupo?: Grupo; presupuesto?: number | null }
+  ) {
+    setFallo(null)
+    setOcupada(sugerencia.id)
+    try {
+      await actualizarSugerencia(sugerencia.id, cambios)
+      onCambio()
+    } catch (causa) {
+      setFallo(mensajeDeFallo(causa))
+    } finally {
+      setOcupada(null)
+    }
+  }
+
   async function quitar(sugerencia: Sugerencia) {
     setFallo(null)
     setOcupada(sugerencia.id)
@@ -133,7 +172,9 @@ export function PanelSugerencias({
       <CardHeader>
         <CardTitle>Sugerencias de concepto</CardTitle>
         <CardDescription>
-          Lo que se ofrece al escribir el concepto, aquí y en el formulario.
+          Lo que se ofrece al escribir el concepto, aquí y en el formulario. El
+          grupo junta conceptos en el dashboard (deudas, familia…) y el tope
+          mensual arma los presupuestos.
         </CardDescription>
       </CardHeader>
 
@@ -193,7 +234,7 @@ export function PanelSugerencias({
             {sugerencias.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center gap-2 p-2 pl-3 text-sm"
+                className="flex flex-wrap items-center gap-2 p-2 pl-3 text-sm"
               >
                 {editando?.id === s.id ? (
                   <>
@@ -231,7 +272,45 @@ export function PanelSugerencias({
                   </>
                 ) : (
                   <>
-                    <span className="min-w-0 flex-1 truncate">{s.nombre}</span>
+                    <span className="min-w-24 flex-1 truncate">{s.nombre}</span>
+                    <Select
+                      value={s.grupo}
+                      onValueChange={(valor: string | null) => {
+                        if (valor && valor !== s.grupo)
+                          void ajustar(s, { grupo: valor as Grupo })
+                      }}
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        aria-label={"Grupo de " + s.nombre}
+                        className="w-40"
+                      >
+                        <SelectValue>
+                          {(valor) =>
+                            GRUPOS.find((g) => g.valor === valor)?.etiqueta
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GRUPOS.map((g) => (
+                          <SelectItem key={g.valor} value={g.valor}>
+                            {g.etiqueta}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {/* La llave cambia con el valor guardado: si llega otro
+                        del servidor, el campo arranca de nuevo con ese. */}
+                    <CampoTope
+                      key={s.presupuesto ?? "sin-tope"}
+                      sugerencia={s}
+                      promedio={
+                        movimientos
+                          ? promedioConcepto(movimientos, s.nombre)
+                          : null
+                      }
+                      onGuardar={(presupuesto) => ajustar(s, { presupuesto })}
+                    />
                     <Button
                       size="icon-sm"
                       variant="ghost"
@@ -262,5 +341,53 @@ export function PanelSugerencias({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * El tope mensual de un concepto: se guarda al salir del campo o con Enter.
+ * Vacío es sin presupuesto. De placeholder va lo que se suele gastar.
+ */
+function CampoTope({
+  sugerencia,
+  promedio,
+  onGuardar,
+}: {
+  sugerencia: Sugerencia
+  promedio: number | null
+  onGuardar: (presupuesto: number | null) => void
+}) {
+  const [texto, setTexto] = React.useState(
+    escribirValor(sugerencia.presupuesto)
+  )
+
+  function guardar() {
+    const valor = leerValor(texto)
+    const limpio = valor && valor <= VALOR_MAX ? valor : null
+    setTexto(escribirValor(limpio))
+    if (limpio !== sugerencia.presupuesto) onGuardar(limpio)
+  }
+
+  return (
+    <InputGroup className="h-7 w-40">
+      <InputGroupAddon className="text-xs">Tope $</InputGroupAddon>
+      <InputGroupInput
+        inputMode="numeric"
+        value={texto}
+        onChange={(e) => setTexto(escribirValor(leerValor(e.target.value)))}
+        onBlur={guardar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur()
+        }}
+        placeholder={promedio ? escribirValor(promedio) : "Sin tope"}
+        title={
+          promedio
+            ? `Sueles gastar ${escribirValor(promedio)} al mes en esto`
+            : undefined
+        }
+        aria-label={"Tope mensual de " + sugerencia.nombre}
+        className="text-xs tabular-nums"
+      />
+    </InputGroup>
   )
 }

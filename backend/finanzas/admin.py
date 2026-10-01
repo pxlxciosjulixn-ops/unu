@@ -23,3 +23,14 @@ class SugerenciaAdmin(admin.ModelAdmin):
 class AvisoEnviadoAdmin(admin.ModelAdmin):
     list_display = ["tipo", "mes", "enviado_at"]
     list_filter = ["tipo"]
+
+
+@admin.register(models.AjusteVisual)
+class AjusteVisualAdmin(admin.ModelAdmin):
+    list_display = ["visitante", "datos", "updated_at"]
+    readonly_fields = ["visitante", "updated_at"]
+
+
+@admin.register(models.Credito)
+class CreditoAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "saldo_inicial", "fecha_inicio", "cupo", "cuota"]

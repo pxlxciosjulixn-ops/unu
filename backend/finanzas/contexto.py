@@ -11,6 +11,7 @@ from __future__ import annotations
 from django.db.models import Count, Min, Sum
 from django.utils import timezone
 
+from finanzas import analisis
 from finanzas.calculos import (
     ResumenMes,
     formato_pesos,
@@ -18,7 +19,7 @@ from finanzas.calculos import (
     primer_dia,
     resumen_mes,
 )
-from finanzas.models import Movimiento
+from finanzas.models import Credito, Movimiento
 
 
 def _pct(valor: float | None) -> str:
@@ -113,8 +114,103 @@ def finanzas_como_texto() -> str | None:
         f"gastos {formato_pesos(gastos)}, balance {formato_pesos(ingresos - gastos)}."
     )
 
+    lineas += _analisis(hoy, mes, actual)
+
     lineas.append("Últimos 15 movimientos (fecha, tipo, concepto, valor):")
     for m in Movimiento.objects.all()[:15]:
         lineas.append(f"- {m.fecha:%Y-%m-%d}, {m.tipo}, {m.concepto}, {formato_pesos(m.valor)}")
 
     return "\n".join(lineas)
+
+
+def _analisis(hoy, mes, actual: ResumenMes) -> list[str]:
+    """Lo mismo que muestra el dashboard: proyección, deudas, grupos, topes."""
+    lineas: list[str] = []
+    recs = analisis.recurrentes(hoy)
+    p = analisis.proyeccion(hoy, recs)
+    lineas.append(
+        f"Proyección al cierre de este mes: ingresos {formato_pesos(p.ingresos_final)}, "
+        f"gastos {formato_pesos(p.gastos_final)}, balance {formato_pesos(p.balance_final)} "
+        f"(gasto variable de {formato_pesos(p.ritmo_diario)} por día, "
+        f"{p.dias_restantes} días restantes)."
+    )
+    if p.pendientes:
+        lineas.append(
+            "- Lo que falta este mes de lo que se repite cada mes (ya sumado): "
+            + "; ".join(
+                f"{r.concepto} ({r.tipo}) {formato_pesos(r.pendiente)}" for r in p.pendientes
+            )
+        )
+    if recs:
+        lineas.append(
+            "Lo que se repite casi todos los meses (monto típico): "
+            + "; ".join(f"{r.concepto} ({r.tipo}) {formato_pesos(r.monto)}" for r in recs[:12])
+        )
+
+    # Grupos del mes en curso y deudas de los últimos 6 meses.
+    siguiente = analisis.date(mes.year + (mes.month == 12), mes.month % 12 + 1, 1)
+    grupos = analisis.por_grupo(mes, siguiente)
+    if grupos:
+        lineas.append(
+            "Gasto por grupo este mes: "
+            + "; ".join(
+                f"{analisis.NOMBRES_GRUPO.get(g, g)} {formato_pesos(v)}"
+                for g, v in sorted(grupos.items(), key=lambda par: -par[1])
+            )
+        )
+    lineas.append("Pagos a deudas por mes, últimos 6 (pagado / % de los ingresos):")
+    cursor = mes
+    for _ in range(6):
+        fin = analisis.date(cursor.year + (cursor.month == 12), cursor.month % 12 + 1, 1)
+        deuda = analisis.por_grupo(cursor, fin).get("deuda", 0)
+        ingresos = resumen_mes(cursor, top=0).ingresos
+        pct = f"{deuda / ingresos * 100:.1f} %" if ingresos else "sin ingresos"
+        lineas.append(f"- {cursor:%Y-%m}: {formato_pesos(deuda)} / {pct}")
+        cursor = mes_anterior(cursor)
+
+    lineas += _creditos()
+
+    topes = analisis.presupuestos(mes)
+    if topes:
+        lineas.append("Presupuestos de este mes (gastado / tope):")
+        lineas += [
+            f"- {e.concepto}: {formato_pesos(e.gastado)} / {formato_pesos(e.tope)} "
+            f"({e.pct:.0f} %)"
+            for e in topes
+        ]
+
+    raros = analisis.fuera_de_lo_normal(hoy)
+    if raros:
+        lineas.append("Gastos recientes muy por encima de lo usual en su concepto:")
+        lineas += [
+            f"- {m.fecha:%Y-%m-%d} {m.concepto} {formato_pesos(m.valor)} "
+            f"(lo usual: {formato_pesos(usual)})"
+            for m, usual in raros[:5]
+        ]
+    return lineas
+
+
+def _creditos() -> list[str]:
+    """Lo que se debe en cada crédito, con su saldo al día."""
+    from finanzas.serializers import CreditoSerializer
+
+    datos = CreditoSerializer(Credito.objects.all(), many=True).data
+    if not datos:
+        return []
+    total = sum(c["saldo"] for c in datos)
+    lineas = [
+        f"Créditos (saldo total {formato_pesos(total)}). Un gasto con el concepto "
+        "del crédito es un abono y baja la deuda; un ingreso es un avance y la sube:"
+    ]
+    for c in datos:
+        partes = [
+            f"saldo {formato_pesos(c['saldo'])}",
+            f"abonado {formato_pesos(c['abonado'])}",
+            f"avances {formato_pesos(c['avances'])} desde {c['fecha_inicio']}",
+        ]
+        if c["cupo"]:
+            partes.append(f"cupo {formato_pesos(c['cupo'])}")
+        if c["cuota"]:
+            partes.append(f"cuota {formato_pesos(c['cuota'])} al mes")
+        lineas.append(f"- {c['nombre']}: " + ", ".join(partes))
+    return lineas

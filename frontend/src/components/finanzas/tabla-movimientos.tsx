@@ -1,8 +1,9 @@
 import * as React from "react"
-import { SearchIcon } from "lucide-react"
+import { FileSpreadsheetIcon, PrinterIcon, SearchIcon } from "lucide-react"
 
 import {
   formatearFechaLocal,
+  hoyISO,
   type Movimiento,
   type Tipo,
 } from "@/components/finanzas/finanzas"
@@ -45,6 +46,33 @@ function normalizar(texto: string) {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("es-CO")
+}
+
+/**
+ * Baja lo listado como CSV para Excel: separado por punto y coma (el Excel en
+ * español toma la coma como decimal) y con BOM para que respete las tildes.
+ */
+function descargarExcel(movimientos: Movimiento[]) {
+  const celda = (texto: string) => `"${texto.replace(/"/g, '""')}"`
+  const filas = [
+    ["Fecha", "Tipo", "Concepto", "Valor"].join(";"),
+    ...movimientos.map((m) =>
+      [
+        m.fecha,
+        m.tipo === "ingreso" ? "Ingreso" : "Gasto",
+        celda(m.concepto),
+        m.tipo === "ingreso" ? m.valor : -m.valor,
+      ].join(";")
+    ),
+  ]
+  const archivo = new Blob([String.fromCharCode(0xfeff) + filas.join("\r\n")], {
+    type: "text/csv;charset=utf-8",
+  })
+  const enlace = document.createElement("a")
+  enlace.href = URL.createObjectURL(archivo)
+  enlace.download = `movimientos-${hoyISO()}.csv`
+  enlace.click()
+  URL.revokeObjectURL(enlace.href)
 }
 
 export function TablaMovimientos({
@@ -104,21 +132,50 @@ export function TablaMovimientos({
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <InputGroup>
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            type="search"
-            value={busqueda}
-            onChange={(e) => {
-              setBusqueda(e.target.value)
-              setVisibles(FILAS)
-            }}
-            placeholder="Buscar por concepto"
-            aria-label="Buscar por concepto"
-          />
-        </InputGroup>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <InputGroup>
+            <InputGroupAddon>
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="search"
+              value={busqueda}
+              onChange={(e) => {
+                setBusqueda(e.target.value)
+                setVisibles(FILAS)
+              }}
+              placeholder="Buscar por concepto"
+              aria-label="Buscar por concepto"
+            />
+          </InputGroup>
+          {/* Exportan lo que está listado: el periodo, el filtro y la
+              búsqueda de arriba. */}
+          <div className="flex shrink-0 gap-2 print:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 flex-1"
+              disabled={!filtrados.length}
+              onClick={() => descargarExcel(filtrados)}
+            >
+              <FileSpreadsheetIcon data-icon="inline-start" />
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 flex-1"
+              onClick={() => {
+                // Al imprimir salen todas las filas, no solo las primeras.
+                setVisibles(filtrados.length)
+                setTimeout(() => window.print(), 50)
+              }}
+            >
+              <PrinterIcon data-icon="inline-start" />
+              PDF
+            </Button>
+          </div>
+        </div>
 
         {!movimientos ? (
           <Skeleton className="h-64 w-full" />

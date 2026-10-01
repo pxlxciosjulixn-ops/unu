@@ -95,8 +95,6 @@ export function GraficaEvolucion({
           </ToggleGroup>
         </CardAction>
       </CardHeader>
-      {/* La tarjeta se estira al alto de la torta de al lado: la gráfica
-          ocupa ese alto en vez de dejar un hueco abajo. */}
       <CardContent className="flex flex-1 flex-col">
         {!datos ? (
           <Skeleton className="h-80 w-full" />
@@ -126,7 +124,10 @@ export function GraficaEvolucion({
                 content={
                   <ChartTooltipContent
                     labelFormatter={(etiqueta) =>
-                      porDia && vista === "periodo"
+                      // Solo el mes en curso viene con el número del día suelto.
+                      porDia &&
+                      vista === "periodo" &&
+                      /^\d+$/.test(String(etiqueta))
                         ? `Día ${etiqueta}`
                         : etiqueta
                     }

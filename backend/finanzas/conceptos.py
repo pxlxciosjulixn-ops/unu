@@ -32,6 +32,27 @@ CONCEPTOS_SEMILLA = [
     "Mama",
 ]
 
+# El grupo con el que arranca cada concepto de la semilla (migración 0006).
+# Se cambia desde la página de edición.
+GRUPOS_SEMILLA = {
+    "Mt15": "deuda",
+    "Nu": "deuda",
+    "Addi": "deuda",
+    "Comida": "comida",
+    "Comida gatos": "mascotas",
+    "Prestamo": "deuda",
+    "Abuelos": "familia",
+    "Pago deuda": "deuda",
+    "Gasolina": "transporte",
+    "Mama": "familia",
+    # No están en la semilla, pero si ya se agregaron, arrancan agrupados.
+    "Indrive": "transporte",
+    "LuckyPlata": "deuda",
+    "Solventa": "deuda",
+    "Cerveza": "gustos",
+    "Cigarrillos": "gustos",
+}
+
 
 def clave(texto: str) -> str:
     """Forma de comparar: sin tildes, en minúsculas y con espacios simples."""
@@ -69,3 +90,13 @@ def homogenizar(texto: str, sugerencias: dict[str, str] | None = None) -> str:
     """El nombre de la sugerencia si coincide; si no, lo escrito sin espacios de sobra."""
     limpio = " ".join(texto.split())
     return nombre_sugerido(limpio, sugerencias) or limpio
+
+
+def grupos() -> dict[str, str]:
+    """Clave → grupo de cada sugerencia guardada."""
+    try:
+        from finanzas.models import Sugerencia
+
+        return {s.clave: s.grupo for s in Sugerencia.objects.only("clave", "grupo")}
+    except DatabaseError:
+        return {clave(nombre): grupo for nombre, grupo in GRUPOS_SEMILLA.items()}

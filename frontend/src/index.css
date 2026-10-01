@@ -351,6 +351,83 @@
     text-shadow: 2px 2px 0 #000000;
 }
 
+/* Las páginas de finanzas en Y2K (ver `finanzas/apariencia.ts`): además de
+   lo de arriba, cada tarjeta es una ventana con su barra de título rosada y
+   sus tres botones, como la de "Welcome", y abajo va la barra de tareas. */
+.finanzas-app.y2k {
+    --y2k-barra: linear-gradient(90deg, #e0198f, #f472b6 55%, #fbcfe8);
+    --y2k-plata: #c0c0c0;
+}
+
+.dark.finanzas-app.y2k {
+    --y2k-barra: linear-gradient(90deg, #6b1d8f, #b0399c 55%, #e879c6);
+    --y2k-plata: #4a4458;
+}
+
+.finanzas-app.y2k [data-slot="card"] {
+    padding-top: 3px;
+}
+
+.finanzas-app.y2k [data-slot="card"]::before {
+    content: "";
+    display: block;
+    flex-shrink: 0;
+    height: 20px;
+    margin: 0 3px;
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='14'%3E%3Cg fill='%23c0c0c0' stroke='%23000' stroke-width='1'%3E%3Crect x='.5' y='.5' width='15' height='13'/%3E%3Crect x='16.5' y='.5' width='15' height='13'/%3E%3Crect x='35.5' y='.5' width='15' height='13'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff'%3E%3Cpath d='M1.5 12.5v-11h13M17.5 12.5v-11h13M36.5 12.5v-11h13'/%3E%3C/g%3E%3Cpath d='M4 10h6v2H4z'/%3E%3Cpath fill='none' stroke='%23000' d='M20.5 3.5h8v7h-8zM20.5 4.5h8'/%3E%3Cpath stroke='%23000' stroke-width='1.6' d='M39.5 3.5l7 7m0-7l-7 7'/%3E%3C/svg%3E")
+            right 3px center / 52px 14px no-repeat,
+        var(--y2k-barra);
+}
+
+/* Botones de periodo y vistas: en relieve, y hundidos el que está elegido. */
+.finanzas-app.y2k [data-slot="toggle-group-item"] {
+    border-radius: 0 !important;
+    border-color: transparent !important;
+    background-color: var(--y2k-plata);
+    box-shadow:
+        inset -1px -1px #0a0a0a,
+        inset 1px 1px #ffffff,
+        inset -2px -2px #808080,
+        inset 2px 2px #dfdfdf;
+}
+
+.finanzas-app.y2k [data-slot="toggle-group-item"][aria-pressed="true"] {
+    background-color: #e4e4e4;
+    background-image: repeating-conic-gradient(#ffffff 0% 25%, #d6d6d6 0% 50%);
+    background-size: 2px 2px;
+    font-weight: 700;
+    box-shadow:
+        inset 1px 1px #0a0a0a,
+        inset -1px -1px #ffffff,
+        inset 2px 2px #808080,
+        inset -2px -2px #dfdfdf;
+}
+
+.dark.finanzas-app.y2k [data-slot="toggle-group-item"][aria-pressed="true"] {
+    background-image: none;
+    background-color: #2a2433;
+}
+
+/* La barra de arriba como la del navegador: plateada y en relieve. */
+.finanzas-app.y2k [data-slot="sidebar-inset"] > header {
+    background: var(--y2k-plata);
+    backdrop-filter: none;
+    border-bottom: 0;
+    box-shadow:
+        inset 0 -1px #0a0a0a,
+        inset 0 1px #ffffff,
+        inset 0 -2px #808080;
+}
+
+/* Las tablas con encabezado de columnas en relieve. */
+.finanzas-app.y2k [data-slot="table-head"] {
+    background: var(--y2k-plata);
+    box-shadow:
+        inset -1px -1px #808080,
+        inset 1px 1px #ffffff;
+}
+
 /* Entrada escalonada del chat: los hijos de `.aparecer` llegan uno tras
    otro con un leve desvanecido. Nada se mueve si el sistema pide reducir
    movimiento. */
@@ -445,6 +522,18 @@
 
   body {
     background: #fff;
+  }
+
+  /* Finanzas a PDF: solo el contenido, sin barra lateral ni barra de
+     arriba, y sin partir una tarjeta entre dos hojas. */
+  .finanzas-app [data-slot="sidebar"],
+  .finanzas-app [data-slot="sidebar-gap"],
+  .finanzas-app [data-slot="sidebar-inset"] > header {
+    display: none !important;
+  }
+
+  .finanzas-app [data-slot="card"] {
+    break-inside: avoid;
   }
 
   /* Evita partir un empleo o una formacion a mitad de pagina. */

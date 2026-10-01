@@ -11,11 +11,13 @@ import { ApiError, fetchJson } from "@/lib/api"
 export const RUTA_API = "/api/finanzas/movimientos/"
 export const RUTA_API_SUGERENCIAS = "/api/finanzas/sugerencias/"
 
-/** Las tres páginas. No se enlazan desde ninguna otra parte del sitio. */
+/** Las páginas. No se enlazan desde ninguna otra parte del sitio. */
 export const RUTAS_FINANZAS = {
   dashboard: "/dashboard/gastos/julian/palacios",
   formulario: "/formulario/gastos/julian/palacios",
   editar: "/editar/gastos/julian/palacios",
+  creditos: "/creditos/gastos/julian/palacios",
+  configuracion: "/configuracion/gastos/julian/palacios",
 }
 
 /**
@@ -39,9 +41,34 @@ export const CONCEPTOS_POR_DEFECTO = [
   "Mama",
 ]
 
+export type Grupo =
+  | "deuda"
+  | "familia"
+  | "comida"
+  | "transporte"
+  | "mascotas"
+  | "hogar"
+  | "gustos"
+  | "otro"
+
+/** Los mismos grupos del modelo en Django, en el orden en que se muestran. */
+export const GRUPOS: { valor: Grupo; etiqueta: string }[] = [
+  { valor: "deuda", etiqueta: "Deudas" },
+  { valor: "familia", etiqueta: "Familia" },
+  { valor: "comida", etiqueta: "Comida" },
+  { valor: "transporte", etiqueta: "Transporte" },
+  { valor: "mascotas", etiqueta: "Mascotas" },
+  { valor: "hogar", etiqueta: "Hogar y servicios" },
+  { valor: "gustos", etiqueta: "Gustos y salidas" },
+  { valor: "otro", etiqueta: "Otros" },
+]
+
 export type Sugerencia = {
   id: number
   nombre: string
+  grupo: Grupo
+  /** Tope de gasto al mes; `null` es sin presupuesto. */
+  presupuesto: number | null
   created_at: string
 }
 
@@ -111,7 +138,11 @@ export type ErroresCampo = Partial<Record<keyof NuevoMovimiento, string>>
  * Envía algo a la API y traduce el 429 del cupo por IP, que es el único error
  * con un mensaje que le sirve a quien está en la página.
  */
-async function escribir<T>(path: string, method: string, datos?: unknown) {
+export async function escribir<T>(
+  path: string,
+  method: string,
+  datos?: unknown
+) {
   try {
     return await fetchJson<T>(path, {
       method,
@@ -148,9 +179,14 @@ export function crearSugerencia(nombre: string) {
 }
 
 export function renombrarSugerencia(id: number, nombre: string) {
-  return escribir<Sugerencia>(`${RUTA_API_SUGERENCIAS}${id}/`, "PATCH", {
-    nombre,
-  })
+  return actualizarSugerencia(id, { nombre })
+}
+
+export function actualizarSugerencia(
+  id: number,
+  cambios: Partial<Pick<Sugerencia, "nombre" | "grupo" | "presupuesto">>
+) {
+  return escribir<Sugerencia>(`${RUTA_API_SUGERENCIAS}${id}/`, "PATCH", cambios)
 }
 
 export function eliminarSugerencia(id: number) {
@@ -189,7 +225,7 @@ export function validar(datos: {
 // Bogotá caería el día anterior, por eso aquí se arma a mano.
 // ---------------------------------------------------------------------------
 
-function aISO(fecha: Date) {
+export function aISO(fecha: Date) {
   const mes = String(fecha.getMonth() + 1).padStart(2, "0")
   const dia = String(fecha.getDate()).padStart(2, "0")
   return `${fecha.getFullYear()}-${mes}-${dia}`
@@ -199,7 +235,7 @@ export function hoyISO() {
   return aISO(new Date())
 }
 
-function aFecha(iso: string) {
+export function aFecha(iso: string) {
   const [anio, mes, dia] = iso.split("-").map(Number)
   return new Date(anio, mes - 1, dia)
 }
@@ -239,11 +275,11 @@ export function escribirValor(valor: number | null) {
 // Periodos del dashboard
 // ---------------------------------------------------------------------------
 
-export type Periodo = "mes" | "3m" | "12m" | "todo"
+export type Periodo = "mes" | "anterior" | "12m" | "todo"
 
 export const PERIODOS: { valor: Periodo; etiqueta: string }[] = [
   { valor: "mes", etiqueta: "Este mes" },
-  { valor: "3m", etiqueta: "3 meses" },
+  { valor: "anterior", etiqueta: "Mes anterior" },
   { valor: "12m", etiqueta: "12 meses" },
   { valor: "todo", etiqueta: "Todo" },
 ]
@@ -251,11 +287,11 @@ export const PERIODOS: { valor: Periodo; etiqueta: string }[] = [
 /** Fechas incluidas, en AAAA-MM-DD; `null` es sin límite por ese lado. */
 type Rango = { desde: string | null; hasta: string | null }
 
-const MESES: Record<Exclude<Periodo, "todo">, number> = {
-  mes: 1,
-  "3m": 3,
-  "12m": 12,
-}
+/** Un mes completo elegido de la lista, como AAAA-MM. */
+export type MesElegido = { mes: string }
+
+/** Lo que filtra el dashboard: un periodo fijo o un mes de la lista. */
+export type Filtro = Periodo | MesElegido
 
 function inicioDeMes(mesesAtras: number) {
   const hoy = new Date()
@@ -266,28 +302,74 @@ function diaAnterior(fecha: Date) {
   return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() - 1)
 }
 
-function rango(periodo: Periodo): Rango {
+/** "Mes anterior" es solo un mes elegido que se mueve con el calendario. */
+function mesElegido(filtro: Filtro): MesElegido | null {
+  if (typeof filtro === "object") return filtro
+  if (filtro === "anterior") return { mes: aISO(inicioDeMes(1)).slice(0, 7) }
+  return null
+}
+
+function primerDia(mes: string) {
+  return aFecha(`${mes}-01`)
+}
+
+function ultimoDia(mes: string) {
+  const inicio = primerDia(mes)
+  return new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0)
+}
+
+function mesPrevio(mes: string) {
+  return aISO(diaAnterior(primerDia(mes))).slice(0, 7)
+}
+
+/** Si la gráfica va día a día: siempre que se mire un solo mes. */
+export function esPorDia(filtro: Filtro) {
+  return filtro === "mes" || mesElegido(filtro) !== null
+}
+
+/** Los meses que tienen algo anotado, del más reciente al más viejo. */
+export function mesesConMovimientos(movimientos: Movimiento[]) {
+  return [...new Set(movimientos.map((m) => m.fecha.slice(0, 7)))]
+    .sort()
+    .reverse()
+}
+
+/** "2026-09" → "septiembre de 2026". */
+export function nombreMes(mes: string) {
+  return mesLargo.format(primerDia(mes))
+}
+
+function rango(periodo: Filtro): Rango {
+  const elegido = mesElegido(periodo)
+  if (elegido) {
+    return {
+      desde: `${elegido.mes}-01`,
+      hasta: aISO(ultimoDia(elegido.mes)),
+    }
+  }
   if (periodo === "todo") return { desde: null, hasta: null }
-  const desde = inicioDeMes(MESES[periodo] - 1)
   if (periodo === "mes") {
     // El mes completo: si se anotó algo con fecha de más adelante en el mes,
     // también cuenta.
+    const desde = inicioDeMes(0)
     const fin = new Date(desde.getFullYear(), desde.getMonth() + 1, 0)
     return { desde: aISO(desde), hasta: aISO(fin) }
   }
-  return { desde: aISO(desde), hasta: null }
+  return { desde: aISO(inicioDeMes(11)), hasta: null }
 }
 
 /**
  * El mismo tramo justo antes, para comparar. El mes en curso se compara con
  * el mes pasado cortado en el mismo día: comparar 21 días contra un mes
- * entero siempre haría ver que se gastó menos.
+ * entero siempre haría ver que se gastó menos. Un mes ya cerrado se compara
+ * con el mes entero de antes.
  */
-function rangoAnterior(periodo: Periodo): Rango | null {
+function rangoAnterior(periodo: Filtro): Rango | null {
+  const elegido = mesElegido(periodo)
+  if (elegido) return rango({ mes: mesPrevio(elegido.mes) })
   if (periodo === "todo") return null
-  const meses = MESES[periodo]
-  const desde = inicioDeMes(meses * 2 - 1)
   if (periodo === "mes") {
+    const desde = inicioDeMes(1)
     const hoy = new Date()
     const finDeMes = new Date(desde.getFullYear(), desde.getMonth() + 1, 0)
     const corte = Math.min(hoy.getDate(), finDeMes.getDate())
@@ -295,8 +377,8 @@ function rangoAnterior(periodo: Periodo): Rango | null {
     return { desde: aISO(desde), hasta: aISO(hasta) }
   }
   return {
-    desde: aISO(desde),
-    hasta: aISO(diaAnterior(inicioDeMes(meses - 1))),
+    desde: aISO(inicioDeMes(23)),
+    hasta: aISO(diaAnterior(inicioDeMes(11))),
   }
 }
 
@@ -309,7 +391,7 @@ function enRango(movimientos: Movimiento[], r: Rango) {
   )
 }
 
-export function filtrarPeriodo(movimientos: Movimiento[], periodo: Periodo) {
+export function filtrarPeriodo(movimientos: Movimiento[], periodo: Filtro) {
   return enRango(movimientos, rango(periodo))
 }
 
@@ -318,7 +400,7 @@ export function filtrarPeriodo(movimientos: Movimiento[], periodo: Periodo) {
  * registro empezó a mitad de ese tramo tampoco se compara: dos meses anotados
  * contra doce darían un "+400 %" que no dice nada.
  */
-export function filtrarAnterior(movimientos: Movimiento[], periodo: Periodo) {
+export function filtrarAnterior(movimientos: Movimiento[], periodo: Filtro) {
   const r = rangoAnterior(periodo)
   if (!r || r.desde === null) return null
   const primera = movimientos.reduce<string | null>(
@@ -330,22 +412,24 @@ export function filtrarAnterior(movimientos: Movimiento[], periodo: Periodo) {
   return enRango(movimientos, r)
 }
 
-export function describirPeriodo(periodo: Periodo) {
+export function describirPeriodo(periodo: Filtro) {
+  const elegido = mesElegido(periodo)
+  if (elegido) return nombreMes(elegido.mes)
   if (periodo === "mes") return mesLargo.format(new Date())
   if (periodo === "todo") return "Todo el historial"
   return `Desde ${mesLargo.format(aFecha(rango(periodo).desde!))}`
 }
 
-export function describirComparacion(periodo: Periodo) {
+const soloMes = new Intl.DateTimeFormat("es-CO", { month: "long" })
+
+export function describirComparacion(periodo: Filtro) {
+  const elegido = mesElegido(periodo)
+  if (elegido) return `vs. ${soloMes.format(primerDia(mesPrevio(elegido.mes)))}`
   if (periodo === "mes") {
-    const pasado = inicioDeMes(1)
-    const nombre = new Intl.DateTimeFormat("es-CO", { month: "long" }).format(
-      pasado
-    )
-    return `vs. ${nombre} al mismo día`
+    return `vs. ${soloMes.format(inicioDeMes(1))} al mismo día`
   }
   if (periodo === "todo") return null
-  return `vs. los ${MESES[periodo]} meses anteriores`
+  return "vs. los 12 meses anteriores"
 }
 
 // ---------------------------------------------------------------------------
@@ -398,9 +482,10 @@ export type PuntoSerie = {
  */
 export function serieTemporal(
   movimientos: Movimiento[],
-  periodo: Periodo
+  periodo: Filtro
 ): PuntoSerie[] {
-  const porDia = periodo === "mes"
+  const porDia = esPorDia(periodo)
+  const elegido = mesElegido(periodo)
   const puntos = new Map<string, PuntoSerie>()
   const hoy = new Date()
   const fechas = movimientos.map((m) => m.fecha).sort()
@@ -408,10 +493,10 @@ export function serieTemporal(
   const ultima = fechas.at(-1)
 
   if (porDia) {
-    const hasta = Math.max(
-      hoy.getDate(),
-      ultima ? Number(ultima.slice(8, 10)) : 0
-    )
+    // Un mes elegido va completo; el mes en curso, hasta hoy.
+    const hasta = elegido
+      ? ultimoDia(elegido.mes).getDate()
+      : Math.max(hoy.getDate(), ultima ? Number(ultima.slice(8, 10)) : 0)
     for (let dia = 1; dia <= hasta; dia++) {
       const clave = String(dia).padStart(2, "0")
       puntos.set(clave, {
@@ -540,19 +625,22 @@ export type DatosPeriodo = {
   conceptosDeGasto: number
 }
 
-function diasEntre(desde: string, hasta: string) {
+export function diasEntre(desde: string, hasta: string) {
   const ms = aFecha(hasta).getTime() - aFecha(desde).getTime()
   return Math.round(ms / 86_400_000) + 1
 }
 
 export function datosPeriodo(
   movimientos: Movimiento[],
-  periodo: Periodo
+  periodo: Filtro
 ): DatosPeriodo {
   const hoy = hoyISO()
   const primera = movimientos.map((m) => m.fecha).sort()[0] ?? hoy
   const desde = rango(periodo).desde ?? primera
-  const dias = Math.max(1, diasEntre(desde, hoy))
+  // Un mes que ya terminó se cuenta hasta su último día, no hasta hoy.
+  const fin = rango(periodo).hasta
+  const hasta = fin !== null && fin < hoy ? fin : hoy
+  const dias = Math.max(1, diasEntre(desde, hasta))
 
   let mayorGasto: Movimiento | null = null
   let mayorIngreso: Movimiento | null = null

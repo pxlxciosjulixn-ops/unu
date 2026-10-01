@@ -2,22 +2,46 @@ import * as React from "react"
 import { CircleAlertIcon, PlusIcon, RefreshCwIcon } from "lucide-react"
 import { Link } from "react-router-dom"
 
+import {
+  acumuladoComparado,
+  calendario,
+  desdeElPrimero,
+  fueraDeLoNormal,
+  historialConcepto,
+  mapaDeGrupos,
+  mesActual,
+  moverMes,
+  nombreMesLargo,
+  porDiaSemana,
+  presupuestos,
+  promedioMeses,
+  proyeccion,
+  recurrentes,
+  resumenPorMes,
+} from "@/components/finanzas/analisis"
 import { AsistenteFinanzas } from "@/components/finanzas/asistente-finanzas"
+import { CompararMeses } from "@/components/finanzas/comparar-meses"
+import { RUTA_API_CREDITOS, type Credito } from "@/components/finanzas/creditos"
 import { DatosDelPeriodo } from "@/components/finanzas/datos-periodo"
 import {
   compararConcepto,
   datosPeriodo,
   describirComparacion,
   describirPeriodo,
+  esPorDia,
   filtrarAnterior,
   filtrarConcepto,
   filtrarPeriodo,
+  hoyISO,
+  mesesConMovimientos,
+  nombreMes,
   opcionesDeConcepto,
   PERIODOS,
   RUTA_API,
   RUTAS_FINANZAS,
   serieTemporal,
   totales,
+  type Filtro,
   type Movimiento,
   type Periodo,
 } from "@/components/finanzas/finanzas"
@@ -26,6 +50,24 @@ import { FinanzasShell } from "@/components/finanzas/finanzas-shell"
 import { GastosPorConcepto } from "@/components/finanzas/gastos-por-concepto"
 import { GraficaDistribucion } from "@/components/finanzas/grafica-distribucion"
 import { GraficaEvolucion } from "@/components/finanzas/grafica-evolucion"
+import {
+  CalendarioCalor,
+  GraficaAcumulado,
+  GraficaAhorro,
+  GraficaDiaSemana,
+  GraficaGrupos,
+  HistorialConcepto,
+} from "@/components/finanzas/graficas-historial"
+import {
+  FamiliaMascotas,
+  FueraDeLoNormal,
+  ListaRecurrentes,
+} from "@/components/finanzas/listas-analisis"
+import { PanelDeudas } from "@/components/finanzas/panel-deudas"
+import {
+  Presupuestos,
+  ProyeccionMes,
+} from "@/components/finanzas/proyeccion-presupuestos"
 import { TablaMovimientos } from "@/components/finanzas/tabla-movimientos"
 import { TarjetasConcepto } from "@/components/finanzas/tarjetas-concepto"
 import { TarjetasResumen } from "@/components/finanzas/tarjetas-resumen"
@@ -37,6 +79,13 @@ import {
   AlertTitle,
 } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useApi } from "@/hooks/use-api"
 
@@ -49,9 +98,26 @@ import { useApi } from "@/hooks/use-api"
  */
 export function DashboardGastosPage() {
   const { data, error, cargando, recargar } = useApi<Movimiento[]>(RUTA_API)
-  const { nombres: sugerencias } = useSugerencias()
-  const [periodo, setPeriodo] = React.useState<Periodo>("mes")
+  const { sugerencias: listaSugerencias, nombres: sugerencias } =
+    useSugerencias()
+  const [periodo, setPeriodo] = React.useState<Periodo | "fechas">("mes")
+  const [mes, setMes] = React.useState(() => hoyISO().slice(0, 7))
   const [concepto, setConcepto] = React.useState<string | null>(null)
+  const [medida, setMedida] = React.useState<"gastos" | "balance">("gastos")
+  const { data: creditos } = useApi<Credito[]>(RUTA_API_CREDITOS)
+
+  // Solo los meses con algo anotado; el mes en curso siempre está, aunque
+  // todavía no tenga nada.
+  const meses = React.useMemo(() => {
+    const conDatos = mesesConMovimientos(data ?? [])
+    const actual = hoyISO().slice(0, 7)
+    return conDatos.includes(actual) ? conDatos : [actual, ...conDatos]
+  }, [data])
+
+  const filtro = React.useMemo<Filtro>(
+    () => (periodo === "fechas" ? { mes } : periodo),
+    [periodo, mes]
+  )
 
   // Las opciones salen de todos los datos, no del periodo: un concepto sin
   // movimientos este mes sigue apareciendo en la lista.
@@ -65,11 +131,11 @@ export function DashboardGastosPage() {
     // Primero el concepto y después el periodo: así la comparación con el
     // periodo anterior también es solo de ese concepto.
     const delConcepto = filtrarConcepto(data, concepto)
-    const movimientos = filtrarPeriodo(delConcepto, periodo)
-    const anteriores = filtrarAnterior(delConcepto, periodo)
+    const movimientos = filtrarPeriodo(delConcepto, filtro)
+    const anteriores = filtrarAnterior(delConcepto, filtro)
     // El periodo entero, sin el filtro: con un concepto elegido, sus propios
     // ingresos suelen ser cero y es contra esto que hay que medirlo.
-    const todos = concepto ? filtrarPeriodo(data, periodo) : movimientos
+    const todos = concepto ? filtrarPeriodo(data, filtro) : movimientos
     return {
       movimientos,
       todos,
@@ -78,10 +144,53 @@ export function DashboardGastosPage() {
       comparacion: concepto
         ? compararConcepto(movimientos, todos, concepto)
         : null,
-      serie: serieTemporal(movimientos, periodo),
-      datos: datosPeriodo(movimientos, periodo),
+      serie: serieTemporal(movimientos, filtro),
+      datos: datosPeriodo(movimientos, filtro),
     }
-  }, [data, periodo, concepto])
+  }, [data, filtro, concepto])
+
+  // Los presupuestos son de un mes: el que se esté mirando, o el actual si
+  // arriba hay un tramo más largo.
+  const mesPresupuesto =
+    periodo === "fechas"
+      ? mes
+      : periodo === "anterior"
+        ? moverMes(mesActual(), 1)
+        : mesActual()
+
+  // El análisis mira todo el historial, sin el periodo ni el concepto de
+  // arriba: tendencias, deudas y lo que se repite necesitan los meses de antes.
+  const analisis = React.useMemo(() => {
+    if (!data) return null
+    const mapa = mapaDeGrupos(listaSugerencias)
+    const recs = recurrentes(data)
+    return {
+      mapa,
+      recs,
+      meses: desdeElPrimero(resumenPorMes(data, mapa, 12), data),
+      proyeccion: proyeccion(data, recs),
+      promedio: promedioMeses(data),
+      anomalias: fueraDeLoNormal(data),
+      calendario: calendario(data, 26),
+      diaSemana: porDiaSemana(data, recs),
+    }
+  }, [data, listaSugerencias])
+
+  const estadosPresupuesto = React.useMemo(
+    () =>
+      data && listaSugerencias
+        ? presupuestos(data, listaSugerencias, mesPresupuesto)
+        : null,
+    [data, listaSugerencias, mesPresupuesto]
+  )
+  const acumulado = React.useMemo(
+    () => (data ? acumuladoComparado(data, medida) : null),
+    [data, medida]
+  )
+  const historial = React.useMemo(
+    () => (data && concepto ? historialConcepto(data, concepto) : null),
+    [data, concepto]
+  )
 
   return (
     <FinanzasShell
@@ -118,7 +227,7 @@ export function DashboardGastosPage() {
               Mis finanzas
             </h1>
             <p className="text-sm text-muted-foreground first-letter:uppercase">
-              {describirPeriodo(periodo)}
+              {describirPeriodo(filtro)}
               {concepto ? ` · solo ${concepto}` : ""}
             </p>
           </div>
@@ -134,7 +243,7 @@ export function DashboardGastosPage() {
               spacing={0}
               value={[periodo]}
               onValueChange={(valores: string[]) => {
-                if (valores[0]) setPeriodo(valores[0] as Periodo)
+                if (valores[0]) setPeriodo(valores[0] as Periodo | "fechas")
               }}
               aria-label="Periodo"
               className="w-full lg:w-fit"
@@ -148,7 +257,41 @@ export function DashboardGastosPage() {
                   {p.etiqueta}
                 </ToggleGroupItem>
               ))}
+              <ToggleGroupItem value="fechas" className="flex-1 lg:flex-none">
+                Fechas
+              </ToggleGroupItem>
             </ToggleGroup>
+            {periodo === "fechas" ? (
+              <Select
+                value={mes}
+                onValueChange={(valor: string | null) => {
+                  if (valor) setMes(valor)
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label="Mes"
+                  className="w-full lg:w-48"
+                >
+                  <SelectValue>
+                    {(valor) => (
+                      <span className="first-letter:uppercase">
+                        {nombreMes(String(valor))}
+                      </span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {meses.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      <span className="first-letter:uppercase">
+                        {nombreMes(m)}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
           </div>
         </div>
 
@@ -175,33 +318,49 @@ export function DashboardGastosPage() {
             <TarjetasConcepto
               comparacion={calculos?.comparacion ?? null}
               anterior={calculos?.resumenAnterior ?? null}
-              descripcionComparacion={describirComparacion(periodo)}
+              descripcionComparacion={describirComparacion(filtro)}
             />
           ) : (
             <TarjetasResumen
               actual={calculos?.resumen ?? null}
               anterior={calculos?.resumenAnterior ?? null}
-              comparacion={describirComparacion(periodo)}
+              comparacion={describirComparacion(filtro)}
+              promedio={esPorDia(filtro) ? analisis?.promedio : null}
             />
           )}
         </section>
 
-        <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <GraficaEvolucion
-            serie={calculos?.serie ?? null}
-            porDia={periodo === "mes"}
-            concepto={concepto}
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
+          <ProyeccionMes datos={analisis?.proyeccion ?? null} />
+          <Presupuestos
+            estados={estadosPresupuesto}
+            mes={nombreMesLargo(mesPresupuesto)}
           />
+        </div>
+
+        {/* La evolución va sola, a todo el ancho: con muchos días o meses se
+            lee mucho mejor que en dos tercios. */}
+        <GraficaEvolucion
+          serie={calculos?.serie ?? null}
+          porDia={esPorDia(filtro)}
+          concepto={concepto}
+        />
+
+        {concepto ? (
+          <HistorialConcepto concepto={concepto} meses={historial} />
+        ) : null}
+
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
           <GraficaDistribucion
             resumen={calculos?.resumen ?? null}
             comparacion={calculos?.comparacion ?? null}
           />
-        </div>
-
-        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-3">
-          <div className="min-w-0 lg:col-span-2 xl:col-span-1">
+          <div className="min-w-0">
             <AsistenteFinanzas />
           </div>
+        </div>
+
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
           <GastosPorConcepto
             movimientos={calculos?.todos ?? null}
             activo={concepto}
@@ -209,6 +368,47 @@ export function DashboardGastosPage() {
           />
           <DatosDelPeriodo datos={calculos?.datos ?? null} />
         </div>
+
+        <div className="mt-4 flex flex-col gap-1">
+          <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
+            Análisis del historial
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Todos los meses, sin el periodo ni el concepto de arriba.
+          </p>
+        </div>
+
+        <PanelDeudas
+          meses={analisis?.meses ?? null}
+          movimientos={data}
+          mapa={analisis?.mapa ?? mapaDeGrupos(null)}
+          creditos={creditos}
+        />
+
+        <GraficaGrupos meses={analisis?.meses ?? null} />
+
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
+          <GraficaAhorro meses={analisis?.meses ?? null} />
+          <GraficaAcumulado
+            datos={acumulado}
+            medida={medida}
+            onMedida={setMedida}
+          />
+        </div>
+
+        <CalendarioCalor datos={analisis?.calendario ?? null} />
+
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
+          <GraficaDiaSemana datos={analisis?.diaSemana ?? null} />
+          <FamiliaMascotas meses={analisis?.meses ?? null} />
+        </div>
+
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
+          <ListaRecurrentes datos={analisis?.recs ?? null} />
+          <FueraDeLoNormal datos={analisis?.anomalias ?? null} />
+        </div>
+
+        <CompararMeses movimientos={data} meses={meses} />
 
         <TablaMovimientos
           movimientos={calculos?.movimientos ?? null}

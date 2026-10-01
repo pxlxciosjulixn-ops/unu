@@ -16,7 +16,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
+from chat.services import hash_visitante, ip_del_visitante
 from finanzas import avisos, models, serializers
+
+# Lo unico que se acepta guardar como ajuste visual, y su largo maximo.
+CAMPOS_AJUSTE = {"estilo": 16, "tema": 16, "acento": 32, "letra": 32}
 
 
 class FinanzasThrottle(ScopedRateThrottle):
@@ -129,3 +133,71 @@ def sugerencia(request: Request, pk: int) -> Response:
     serializador.is_valid(raise_exception=True)
     serializador.save()
     return Response(serializador.data)
+
+
+@api_view(["GET", "POST"])
+@throttle_classes([FinanzasThrottle])
+def creditos(request: Request) -> Response:
+    """
+    GET: los créditos con su saldo al día.
+    POST: registra uno; su concepto pasa a ser sugerencia del grupo Deudas.
+    """
+    if request.method == "GET":
+        return Response(
+            serializers.CreditoSerializer(models.Credito.objects.all(), many=True).data
+        )
+    serializador = serializers.CreditoSerializer(data=request.data)
+    serializador.is_valid(raise_exception=True)
+    serializador.save()
+    return Response(serializador.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PUT", "PATCH", "DELETE"])
+@throttle_classes([FinanzasThrottle])
+def credito(request: Request, pk: int) -> Response:
+    """
+    Corrige un crédito o lo quita. Quitarlo no toca los movimientos: los pagos
+    siguen ahí, solo deja de llevarse la cuenta del saldo.
+    """
+    fila = get_object_or_404(models.Credito, pk=pk)
+    if request.method == "DELETE":
+        fila.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    serializador = serializers.CreditoSerializer(
+        fila, data=request.data, partial=request.method == "PATCH"
+    )
+    serializador.is_valid(raise_exception=True)
+    serializador.save()
+    return Response(serializador.data)
+
+
+@api_view(["GET", "PUT"])
+@throttle_classes([FinanzasThrottle])
+def ajustes(request: Request) -> Response:
+    """
+    El diseño elegido por quien entra desde esta IP.
+
+    GET: lo guardado, o `{}` si nunca se ha elegido nada.
+    PUT: lo reemplaza. Solo se guardan los campos conocidos y como texto
+    corto; que el valor exista (un color, una letra) lo revisa el navegador,
+    que vuelve al de por defecto si no lo reconoce.
+    """
+    visitante = hash_visitante(ip_del_visitante(request))
+
+    if request.method == "GET":
+        fila = models.AjusteVisual.objects.filter(visitante=visitante).first()
+        return Response(fila.datos if fila else {})
+
+    if not isinstance(request.data, dict):
+        return Response(
+            {"detail": "Se esperaba un objeto."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    datos = {
+        campo: valor
+        for campo, largo in CAMPOS_AJUSTE.items()
+        if isinstance(valor := request.data.get(campo), str) and len(valor) <= largo
+    }
+    models.AjusteVisual.objects.update_or_create(
+        visitante=visitante, defaults={"datos": datos}
+    )
+    return Response(datos)

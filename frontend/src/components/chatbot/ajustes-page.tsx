@@ -1,13 +1,5 @@
 import * as React from "react"
-import {
-  ArrowLeftIcon,
-  CheckIcon,
-  LockIcon,
-  LockOpenIcon,
-  MonitorIcon,
-  MoonIcon,
-  SunIcon,
-} from "lucide-react"
+import { ArrowLeftIcon, CheckIcon, LockIcon, LockOpenIcon } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { AppShell } from "@/components/app-shell"
@@ -25,16 +17,13 @@ import { PERSONALIDADES } from "@/components/chatbot/personalidades"
 import { AplicarPersonalizacion } from "@/components/chatbot/aplicar-personalizacion"
 import { ListaEliminados } from "@/components/chatbot/papelera"
 import {
-  ACENTOS,
-  ACENTOS_CLAROS,
-  ACENTOS_INTENSOS,
+  Campo,
+  ControlesEstilo,
+  Opcion,
+} from "@/components/chatbot/controles-estilo"
+import {
   cambiarPersonalizacion,
-  cargarFuentes,
-  LETRA_DEL_ESTILO,
-  LETRAS,
   usePersonalizacion,
-  type Estilo,
-  type Tema,
 } from "@/components/chatbot/personalizacion"
 import { SidebarConsejero } from "@/components/chatbot/sidebar-consejero"
 import {
@@ -57,9 +46,7 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -223,150 +210,9 @@ function Seccion({
   )
 }
 
-function Campo({
-  etiqueta,
-  children,
-}: {
-  etiqueta: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-2.5">
-      <p className="text-sm font-medium">{etiqueta}</p>
-      {children}
-    </div>
-  )
-}
-
-function Opcion({
-  elegida,
-  onElegir,
-  className,
-  children,
-}: {
-  elegida: boolean
-  onElegir: () => void
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={elegida}
-      onClick={onElegir}
-      className={cn(
-        "flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition hover:border-foreground/30",
-        elegida
-          ? "border-foreground bg-muted/60 ring-1 ring-foreground"
-          : "bg-background",
-        className
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-const TEMAS: { valor: Tema; nombre: string; icono: typeof SunIcon }[] = [
-  { valor: "claro", nombre: "Claro", icono: SunIcon },
-  { valor: "oscuro", nombre: "Oscuro", icono: MoonIcon },
-  { valor: "sistema", nombre: "Sistema", icono: MonitorIcon },
-]
-
-const ESTILOS: { valor: Estilo; nombre: string; detalle: string }[] = [
-  { valor: "normal", nombre: "Normal", detalle: "Limpio y moderno" },
-  {
-    valor: "vintage",
-    nombre: "Vintage",
-    detalle: "Papel, tinta y máquina de escribir",
-  },
-  {
-    valor: "y2k",
-    nombre: "Web 1.0 / Y2K",
-    detalle: "Windows 98 y escritorio rosado",
-  },
-]
-
-/** Muestra en miniatura de cada estilo, dibujada con sus propios colores. */
-function MuestraEstilo({ estilo }: { estilo: Estilo }) {
-  if (estilo === "y2k") {
-    // Ventanita de Windows 98 sobre el escritorio rosado.
-    return (
-      <div
-        aria-hidden
-        className="flex h-20 w-full items-center justify-center overflow-hidden p-2.5"
-        style={{
-          backgroundColor: "#f7b2ea",
-          backgroundImage:
-            "repeating-conic-gradient(#f59ce3 0% 25%, #fbc9f1 0% 50%)",
-          backgroundSize: "6px 6px",
-        }}
-      >
-        <div
-          className="flex w-4/5 flex-col bg-[#c0c0c0] p-[3px]"
-          style={{
-            boxShadow:
-              "inset -1px -1px #0a0a0a, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf",
-          }}
-        >
-          <span className="h-2.5 bg-linear-to-r from-[#000080] to-[#1084d0]" />
-          <span className="mt-1 h-3 bg-white shadow-[inset_1px_1px_#808080]" />
-        </div>
-      </div>
-    )
-  }
-  const vintage = estilo === "vintage"
-  return (
-    <div
-      aria-hidden
-      className={cn(
-        "flex h-20 w-full flex-col justify-end gap-1.5 overflow-hidden border p-2.5",
-        vintage
-          ? "rounded-[5px] border-[#cdb991] bg-[#f3ead6]"
-          : "rounded-lg border-neutral-200 bg-white"
-      )}
-    >
-      <span
-        className={cn(
-          "h-3 w-3/5 self-end",
-          vintage
-            ? "rounded-[3px] bg-[#7a3b24] shadow-[2px_2px_0_#00000030]"
-            : "rounded-full bg-neutral-900"
-        )}
-      />
-      <span
-        className={cn(
-          "h-3 w-4/5",
-          vintage
-            ? "rounded-[3px] border border-[#cdb991] bg-[#fbf6ea] shadow-[2px_2px_0_#00000020]"
-            : "rounded-full border border-neutral-200 bg-neutral-50"
-        )}
-      />
-    </div>
-  )
-}
-
 /** Estilo, tema, color de acento y letra: se guarda en este navegador. */
 function Personalizacion() {
   const personalizacion = usePersonalizacion()
-  const { estilo, tema, acento, letra } = personalizacion
-
-  // Para ver cada letra en la lista hay que tenerlas cargadas.
-  React.useEffect(() => {
-    cargarFuentes(Object.keys(LETRAS))
-  }, [])
-
-  const grupos = Object.entries(LETRAS).reduce<
-    Record<string, [string, (typeof LETRAS)[string]][]>
-  >((acumulado, entrada) => {
-    ;(acumulado[entrada[1].grupo] ??= []).push(entrada)
-    return acumulado
-  }, {})
-  const nombreLetra = (clave: string) =>
-    clave === "auto"
-      ? `Automática (${LETRAS[LETRA_DEL_ESTILO[estilo]].nombre})`
-      : (LETRAS[clave]?.nombre ?? clave)
 
   return (
     <Seccion
@@ -374,178 +220,15 @@ function Personalizacion() {
       detalle="Cómo se ve el chat en este navegador. Se aplica al instante."
     >
       <div className="flex flex-col gap-6">
-        <Campo etiqueta="Estilo">
-          <div
-            role="radiogroup"
-            aria-label="Estilo"
-            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-          >
-            {ESTILOS.map((e) => (
-              <Opcion
-                key={e.valor}
-                elegida={estilo === e.valor}
-                onElegir={() => cambiarPersonalizacion({ estilo: e.valor })}
-                className="flex-col items-stretch gap-2.5 p-3 text-left"
-              >
-                <MuestraEstilo estilo={e.valor} />
-                <span className="flex flex-col">
-                  <span className="font-medium">{e.nombre}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {e.detalle}
-                  </span>
-                </span>
-              </Opcion>
-            ))}
-          </div>
-        </Campo>
-
-        <Campo etiqueta="Tema">
-          <div
-            role="radiogroup"
-            aria-label="Tema"
-            className="grid grid-cols-3 gap-2"
-          >
-            {TEMAS.map((t) => (
-              <Opcion
-                key={t.valor}
-                elegida={tema === t.valor}
-                onElegir={() => cambiarPersonalizacion({ tema: t.valor })}
-              >
-                <t.icono className="size-4" />
-                {t.nombre}
-              </Opcion>
-            ))}
-          </div>
-        </Campo>
-
-        <Campo etiqueta="Color de acento">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Paleta
-              titulo="Intensos"
-              claves={ACENTOS_INTENSOS}
-              elegido={acento}
-            />
-            <Paleta
-              titulo="Claritos"
-              claves={ACENTOS_CLAROS}
-              elegido={acento}
-            />
-          </div>
-        </Campo>
-
-        <Campo etiqueta="Letra">
-          <Select
-            value={letra}
-            onValueChange={(valor: string | null) => {
-              if (valor) cambiarPersonalizacion({ letra: valor })
-            }}
-          >
-            <SelectTrigger
-              aria-label="Letra"
-              className="h-11! w-full bg-background"
-            >
-              <SelectValue>
-                {(valor) => (
-                  <span
-                    style={{
-                      fontFamily:
-                        LETRAS[
-                          valor === "auto"
-                            ? LETRA_DEL_ESTILO[estilo]
-                            : String(valor)
-                        ]?.familia ?? undefined,
-                    }}
-                  >
-                    {nombreLetra(String(valor))}
-                  </span>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="max-h-80">
-              <SelectItem value="auto">
-                Automática ({LETRAS[LETRA_DEL_ESTILO[estilo]].nombre})
-              </SelectItem>
-              {Object.entries(grupos).map(([grupo, letras]) => (
-                <SelectGroup key={grupo}>
-                  <SelectLabel>{grupo}</SelectLabel>
-                  {letras.map(([clave, datos]) => (
-                    <SelectItem
-                      key={clave}
-                      value={clave}
-                      style={{ fontFamily: datos.familia ?? undefined }}
-                    >
-                      {datos.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-          <p
-            className="rounded-xl bg-muted/50 px-4 py-3 text-sm"
-            style={{
-              fontFamily:
-                LETRAS[letra === "auto" ? LETRA_DEL_ESTILO[estilo] : letra]
-                  ?.familia ?? undefined,
-            }}
-          >
-            Mire, ella le responde corto y sin hacerle preguntas.
-          </p>
-        </Campo>
+        <ControlesEstilo
+          valor={personalizacion}
+          onCambiar={cambiarPersonalizacion}
+          ejemplo="Mire, ella le responde corto y sin hacerle preguntas."
+        />
 
         {HAY_VOZ ? <CampoVoz /> : null}
       </div>
     </Seccion>
-  )
-}
-
-function Paleta({
-  titulo,
-  claves,
-  elegido,
-}: {
-  titulo: string
-  claves: string[]
-  elegido: string
-}) {
-  return (
-    <div className="flex flex-col gap-2 rounded-xl border bg-background p-3">
-      <p className="text-xs text-muted-foreground">{titulo}</p>
-      <div
-        role="radiogroup"
-        aria-label={`Colores ${titulo.toLowerCase()}`}
-        className="grid grid-cols-7 gap-2"
-      >
-        {claves.map((clave) => {
-          const color = ACENTOS[clave]
-          const activo = elegido === clave
-          const nombre = color?.nombre ?? "Neutro"
-          return (
-            <button
-              key={clave}
-              type="button"
-              role="radio"
-              aria-checked={activo}
-              aria-label={nombre}
-              title={nombre}
-              onClick={() => cambiarPersonalizacion({ acento: clave })}
-              className={cn(
-                "flex aspect-square w-full items-center justify-center rounded-full border ring-offset-2 ring-offset-background transition",
-                activo ? "ring-2 ring-foreground" : "hover:scale-105"
-              )}
-              style={{ background: color?.claro ?? "var(--foreground)" }}
-            >
-              {activo ? (
-                <CheckIcon
-                  className="size-3.5"
-                  style={{ color: color?.texto ?? "var(--background)" }}
-                />
-              ) : null}
-            </button>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 

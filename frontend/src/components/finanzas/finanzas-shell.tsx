@@ -1,6 +1,20 @@
+import * as React from "react"
 import type { LucideIcon } from "lucide-react"
 import {
+  ArrowLeftRightIcon,
   BotIcon,
+  CalendarDaysIcon,
+  CalendarRangeIcon,
+  ChartColumnStackedIcon,
+  CreditCardIcon,
+  HeartIcon,
+  LandmarkIcon,
+  PiggyBankIcon,
+  RepeatIcon,
+  TargetIcon,
+  TelescopeIcon,
+  TrendingUpIcon,
+  TriangleAlertIcon,
   ChartBarBigIcon,
   ChartLineIcon,
   ChartPieIcon,
@@ -10,15 +24,20 @@ import {
   ListIcon,
   NotebookPenIcon,
   PencilLineIcon,
+  SettingsIcon,
   SquarePlusIcon,
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
 import { AppShell } from "@/components/app-shell"
+import { AplicarApariencia } from "@/components/chatbot/aplicar-personalizacion"
+import { useApariencia } from "@/components/finanzas/apariencia"
+import { BarraTareas } from "@/components/finanzas/barra-tareas"
 import { RUTAS_FINANZAS } from "@/components/finanzas/finanzas"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -46,6 +65,11 @@ const PAGINAS: Pagina[] = [
     to: RUTAS_FINANZAS.editar,
     icon: PencilLineIcon,
   },
+  {
+    titulo: "Créditos",
+    to: RUTAS_FINANZAS.creditos,
+    icon: CreditCardIcon,
+  },
 ]
 
 type Ancla = { titulo: string; hash: string; icon: LucideIcon }
@@ -54,11 +78,31 @@ type Ancla = { titulo: string; hash: string; icon: LucideIcon }
 const SECCIONES: Record<string, Ancla[]> = {
   [RUTAS_FINANZAS.dashboard]: [
     { titulo: "Resumen", hash: "#resumen", icon: GaugeIcon },
+    { titulo: "Proyección", hash: "#proyeccion", icon: TelescopeIcon },
+    { titulo: "Presupuestos", hash: "#presupuestos", icon: TargetIcon },
     { titulo: "Evolución", hash: "#evolucion", icon: ChartLineIcon },
     { titulo: "Ingresos vs. gastos", hash: "#balance", icon: ChartPieIcon },
     { titulo: "Asistente IA", hash: "#asistente", icon: BotIcon },
     { titulo: "Por concepto", hash: "#conceptos", icon: ChartBarBigIcon },
     { titulo: "Datos del periodo", hash: "#datos", icon: NotebookPenIcon },
+    { titulo: "Deudas", hash: "#deudas", icon: LandmarkIcon },
+    { titulo: "Por grupo", hash: "#grupos", icon: ChartColumnStackedIcon },
+    { titulo: "Ahorro por mes", hash: "#ahorro", icon: PiggyBankIcon },
+    { titulo: "Este mes vs. pasado", hash: "#acumulado", icon: TrendingUpIcon },
+    { titulo: "Calendario", hash: "#calendario", icon: CalendarDaysIcon },
+    {
+      titulo: "Día de la semana",
+      hash: "#dia-semana",
+      icon: CalendarRangeIcon,
+    },
+    { titulo: "Familia y mascotas", hash: "#familia", icon: HeartIcon },
+    { titulo: "Lo que se repite", hash: "#recurrentes", icon: RepeatIcon },
+    {
+      titulo: "Fuera de lo normal",
+      hash: "#anomalias",
+      icon: TriangleAlertIcon,
+    },
+    { titulo: "Comparar meses", hash: "#comparar", icon: ArrowLeftRightIcon },
     { titulo: "Movimientos", hash: "#movimientos", icon: ListIcon },
   ],
   [RUTAS_FINANZAS.editar]: [
@@ -136,6 +180,21 @@ function FinanzasSidebar() {
         ) : null}
       </SidebarContent>
 
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === RUTAS_FINANZAS.configuracion}
+              tooltip="Configuración"
+              render={<Link to={RUTAS_FINANZAS.configuracion} />}
+            >
+              <SettingsIcon />
+              <span>Configuración</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   )
@@ -155,6 +214,15 @@ export function FinanzasShell({
   acciones?: React.ReactNode
   children: React.ReactNode
 }) {
+  const apariencia = useApariencia()
+
+  // Marca `<html>` para que el CSS sepa que son las páginas de finanzas: el
+  // Y2K de aquí lleva barras de título y barra de tareas, el del chat no.
+  React.useEffect(() => {
+    document.documentElement.classList.add("finanzas-app")
+    return () => document.documentElement.classList.remove("finanzas-app")
+  }, [])
+
   return (
     <AppShell
       titulo={titulo}
@@ -164,7 +232,9 @@ export function FinanzasShell({
     >
       {/* Página personal: que no la indexe ningún buscador. */}
       <meta name="robots" content="noindex, nofollow" />
+      <AplicarApariencia apariencia={apariencia} />
       {children}
+      {apariencia.estilo === "y2k" ? <BarraTareas titulo={titulo} /> : null}
     </AppShell>
   )
 }

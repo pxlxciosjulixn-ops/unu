@@ -76,6 +76,18 @@ const EditarGastosPage = lazy(() =>
   }))
 )
 
+const CreditosGastosPage = lazy(() =>
+  import("@/components/finanzas/creditos-page").then((m) => ({
+    default: m.CreditosGastosPage,
+  }))
+)
+
+const ConfiguracionGastosPage = lazy(() =>
+  import("@/components/finanzas/configuracion-page").then((m) => ({
+    default: m.ConfiguracionGastosPage,
+  }))
+)
+
 const LoginPage = lazy(() =>
   import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
 )
@@ -176,6 +188,22 @@ export function App() {
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <EditarGastosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/creditos/gastos/julian/palacios"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <CreditosGastosPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/configuracion/gastos/julian/palacios"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <ConfiguracionGastosPage />
               </Suspense>
             }
           />

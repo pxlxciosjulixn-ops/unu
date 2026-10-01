@@ -107,6 +107,7 @@ export function EditarGastosPage() {
 
         <PanelSugerencias
           sugerencias={sugerencias}
+          movimientos={data}
           onCambio={recargarSugerencias}
         />
       </div>

@@ -6,6 +6,7 @@ import {
   letraEfectiva,
   LETRAS,
   usePersonalizacion,
+  type Personalizacion,
 } from "@/components/chatbot/personalizacion"
 
 function useOscuroDelSistema() {
@@ -37,9 +38,20 @@ const VARIABLES_DE_ACENTO = [
  * cosas (ver `index.css`), y encima de ellas se pueden elegir color y letra.
  */
 export function AplicarPersonalizacion() {
-  const personalizacion = usePersonalizacion()
-  const { tema, acento, estilo } = personalizacion
-  const letra = letraEfectiva(personalizacion)
+  return <AplicarApariencia apariencia={usePersonalizacion()} />
+}
+
+/**
+ * Lo mismo, con la apariencia que se le pase: las páginas de finanzas
+ * guardan la suya aparte de la del chat.
+ */
+export function AplicarApariencia({
+  apariencia,
+}: {
+  apariencia: Pick<Personalizacion, "tema" | "acento" | "estilo" | "letra">
+}) {
+  const { tema, acento, estilo } = apariencia
+  const letra = letraEfectiva(apariencia)
   const oscuroSistema = useOscuroDelSistema()
   const oscuro = tema === "oscuro" || (tema === "sistema" && oscuroSistema)
 
