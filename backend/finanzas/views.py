@@ -9,6 +9,9 @@ la tabla.
 
 from __future__ import annotations
 
+import io
+
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, throttle_classes
@@ -17,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from chat.services import hash_visitante, ip_del_visitante
-from finanzas import avisos, models, serializers
+from finanzas import avisos, models, respaldo, serializers
 
 # Lo unico que se acepta guardar como ajuste visual, y su largo maximo.
 CAMPOS_AJUSTE = {"estilo": 16, "tema": 16, "acento": 32, "letra": 32}
@@ -201,3 +204,22 @@ def ajustes(request: Request) -> Response:
         visitante=visitante, defaults={"datos": datos}
     )
     return Response(datos)
+
+
+@api_view(["GET"])
+@throttle_classes([FinanzasThrottle])
+def exportar(request: Request) -> HttpResponse:
+    """
+    Todo lo de finanzas en un JSON para descargar: movimientos, créditos,
+    sugerencias y avisos. Es el mismo formato del script de backup y se
+    restaura con `loaddata`.
+    """
+    contenido = io.StringIO()
+    respaldo.escribir(contenido, con_ajustes=False)
+    respuesta = HttpResponse(
+        contenido.getvalue(), content_type="application/json; charset=utf-8"
+    )
+    respuesta["Content-Disposition"] = (
+        f'attachment; filename="{respaldo.nombre_archivo()}"'
+    )
+    return respuesta

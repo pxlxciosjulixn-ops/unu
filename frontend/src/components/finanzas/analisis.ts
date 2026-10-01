@@ -13,6 +13,7 @@ import {
   diasEntre,
   homogenizarConcepto,
   hoyISO,
+  saldoAntesDe,
   type Grupo,
   type Movimiento,
   type Sugerencia,
@@ -286,6 +287,8 @@ export function recurrentes(movimientos: Movimiento[], mes = mesActual()) {
 }
 
 export type Proyeccion = {
+  /** Lo que sobró de los meses anteriores y entra a este. */
+  saldoAnterior: number
   ingresos: number
   gastos: number
   ingresosFinal: number
@@ -345,6 +348,7 @@ export function proyeccion(
   }
 
   const diasRestantes = diasDelMes(mes) - dia
+  const saldoAnterior = saldoAntesDe(movimientos, `${mes}-01`)
   const pendientes = recs.filter((r) => r.pendiente > 0)
   const pendienteDe = (tipo: Tipo) =>
     pendientes
@@ -355,11 +359,12 @@ export function proyeccion(
     gastos + ritmo * diasRestantes + pendienteDe("gasto")
   )
   return {
+    saldoAnterior,
     ingresos,
     gastos,
     ingresosFinal,
     gastosFinal,
-    balanceFinal: ingresosFinal - gastosFinal,
+    balanceFinal: saldoAnterior + ingresosFinal - gastosFinal,
     ritmoDiario: Math.round(ritmo),
     diasRestantes,
     pendientes,

@@ -1,10 +1,11 @@
+import json
 from datetime import date
 
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from finanzas import analisis
-from finanzas.models import AjusteVisual, Movimiento, Sugerencia
+from finanzas.models import AjusteVisual, Credito, Movimiento, Sugerencia
 
 
 def anotar(fecha: str, tipo: str, concepto: str, valor: int) -> None:
@@ -41,6 +42,17 @@ class AnalisisTests(TestCase):
         fijo = 60_000 + 300_000 + 840_000
         self.assertGreater(p.gastos_final, fijo)
         self.assertLess(p.gastos_final, fijo + 100_000)
+
+    def test_saldo_anterior_arrastra_lo_que_sobro(self):
+        # Cada mes: entran 2.000.000 y salen 1.200.000 (Nu + comida).
+        self.assertEqual(analisis.saldo_anterior(date(2026, 7, 1)), 800_000)
+        # Julio tuvo además la ropa: lo que sobra se va sumando de mes a mes.
+        self.assertEqual(
+            analisis.saldo_anterior(date(2026, 10, 1)), 800_000 * 4 - 100_000
+        )
+        self.assertEqual(analisis.saldo_anterior(date(2026, 6, 1)), 0)
+        p = analisis.proyeccion(date(2026, 10, 2))
+        self.assertEqual(p.saldo_anterior, 3_100_000)
 
     def test_proyeccion_cuenta_la_segunda_quincena(self):
         anotar("2026-10-01", "ingreso", "Sueldo", 1_000_000)
@@ -131,3 +143,20 @@ class CreditosTests(TestCase):
             "/api/finanzas/creditos/", {**datos, "nombre": "NU "}, format="json"
         )
         self.assertEqual(r.status_code, 400)
+
+
+class ExportarTests(TestCase):
+    def test_trae_todo_menos_los_ajustes(self):
+        anotar("2026-09-05", "gasto", "Nu", 100_000)
+        Credito.objects.create(
+            nombre="Nu", saldo_inicial=500_000, fecha_inicio=date(2026, 9, 1)
+        )
+        AjusteVisual.objects.create(visitante="x" * 64, datos={"estilo": "y2k"})
+        r = APIClient(HTTP_HOST="localhost").get("/api/finanzas/exportar/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("attachment", r["Content-Disposition"])
+        modelos = {fila["model"] for fila in json.loads(r.content)}
+        self.assertEqual(
+            modelos,
+            {"finanzas.movimiento", "finanzas.credito", "finanzas.sugerencia"},
+        )

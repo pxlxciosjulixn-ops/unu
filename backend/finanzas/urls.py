@@ -12,4 +12,5 @@ urlpatterns = [
     path("creditos/", views.creditos, name="creditos"),
     path("creditos/<int:pk>/", views.credito, name="credito"),
     path("ajustes/", views.ajustes, name="ajustes"),
+    path("exportar/", views.exportar, name="exportar"),
 ]

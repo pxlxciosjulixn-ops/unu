@@ -20,6 +20,7 @@ import {
   resumenPorMes,
 } from "@/components/finanzas/analisis"
 import { AsistenteFinanzas } from "@/components/finanzas/asistente-finanzas"
+import { BotonExportar } from "@/components/finanzas/boton-exportar"
 import { CompararMeses } from "@/components/finanzas/comparar-meses"
 import { RUTA_API_CREDITOS, type Credito } from "@/components/finanzas/creditos"
 import { DatosDelPeriodo } from "@/components/finanzas/datos-periodo"
@@ -31,8 +32,10 @@ import {
   esPorDia,
   filtrarAnterior,
   filtrarConcepto,
+  conSaldoAnterior,
   filtrarPeriodo,
   hoyISO,
+  iniciosDe,
   mesesConMovimientos,
   nombreMes,
   opcionesDeConcepto,
@@ -131,15 +134,32 @@ export function DashboardGastosPage() {
     // Primero el concepto y después el periodo: así la comparación con el
     // periodo anterior también es solo de ese concepto.
     const delConcepto = filtrarConcepto(data, concepto)
-    const movimientos = filtrarPeriodo(delConcepto, filtro)
-    const anteriores = filtrarAnterior(delConcepto, filtro)
+    // Lo que sobró de antes entra como ingreso automático del primer día. Con
+    // un concepto elegido no: ese saldo no es de ningún concepto.
+    const inicios = iniciosDe(filtro)
+    const conSaldo = (lista: Movimiento[], desde: string | null) =>
+      concepto ? lista : conSaldoAnterior(lista, data, desde)
+    const movimientos = conSaldo(
+      filtrarPeriodo(delConcepto, filtro),
+      inicios.actual
+    )
+    const crudosAnteriores = filtrarAnterior(delConcepto, filtro)
+    const anteriores =
+      crudosAnteriores && conSaldo(crudosAnteriores, inicios.anterior)
     // El periodo entero, sin el filtro: con un concepto elegido, sus propios
     // ingresos suelen ser cero y es contra esto que hay que medirlo.
-    const todos = concepto ? filtrarPeriodo(data, filtro) : movimientos
+    const todos = concepto
+      ? filtrarPeriodo(data, filtro)
+      : movimientos.filter((m) => !m.automatico)
     return {
       movimientos,
       todos,
-      resumen: totales(movimientos),
+      // Ingresos y balance cuentan el saldo de antes; el % de ahorro no, que
+      // mide qué parte de lo que entró en el periodo quedó sin gastar.
+      resumen: {
+        ...totales(movimientos),
+        ahorroPct: totales(movimientos.filter((m) => !m.automatico)).ahorroPct,
+      },
       resumenAnterior: anteriores ? totales(anteriores) : null,
       comparacion: concepto
         ? compararConcepto(movimientos, todos, concepto)
@@ -207,6 +227,7 @@ export function DashboardGastosPage() {
             <RefreshCwIcon data-icon="inline-start" />
             <span className="hidden sm:inline">Actualizar</span>
           </Button>
+          <BotonExportar />
           <Button
             size="sm"
             nativeButton={false}

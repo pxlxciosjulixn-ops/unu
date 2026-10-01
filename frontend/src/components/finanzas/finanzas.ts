@@ -124,6 +124,11 @@ export type Movimiento = {
   concepto: string
   valor: number
   created_at: string
+  /**
+   * Calculado, no guardado: el saldo que viene de los meses anteriores (ver
+   * `conSaldoAnterior`). No se puede editar ni borrar.
+   */
+  automatico?: true
 }
 
 export type NuevoMovimiento = Pick<
@@ -400,6 +405,60 @@ export function filtrarPeriodo(movimientos: Movimiento[], periodo: Filtro) {
  * registro empezó a mitad de ese tramo tampoco se compara: dos meses anotados
  * contra doce darían un "+400 %" que no dice nada.
  */
+/**
+ * Con cuánto se entra a una fecha: todo lo que entró menos todo lo que salió
+ * antes de ese día. Lo que sobró en septiembre (y lo que venía de agosto…)
+ * arranca octubre; negativo si se arrastra un faltante.
+ */
+export function saldoAntesDe(movimientos: Movimiento[], fecha: string) {
+  let saldo = 0
+  for (const m of movimientos) {
+    if (m.automatico || m.fecha >= fecha) continue
+    saldo += m.tipo === "ingreso" ? m.valor : -m.valor
+  }
+  return saldo
+}
+
+/**
+ * Los movimientos de un tramo con el saldo de antes al principio, como un
+ * ingreso automático del primer día ("Saldo de septiembre"), o un gasto si
+ * lo que se arrastra es un faltante. No se guarda en ningún lado: se calcula
+ * de nuevo cada vez, así que corregir un gasto viejo lo cambia solo.
+ *
+ * `todos` es la lista completa (sin filtro de concepto), que es de donde sale
+ * la plata que sobró. "Todo el historial" no tiene un antes.
+ */
+export function conSaldoAnterior(
+  delTramo: Movimiento[],
+  todos: Movimiento[],
+  desde: string | null
+): Movimiento[] {
+  if (desde === null) return delTramo
+  const saldo = saldoAntesDe(todos, desde)
+  if (saldo === 0) return delTramo
+  const mesPrevio = new Intl.DateTimeFormat("es-CO", { month: "long" }).format(
+    diaAnterior(aFecha(desde))
+  )
+  const automatico: Movimiento = {
+    id: -1,
+    fecha: desde,
+    tipo: saldo > 0 ? "ingreso" : "gasto",
+    concepto: saldo > 0 ? `Saldo de ${mesPrevio}` : `Faltante de ${mesPrevio}`,
+    valor: Math.abs(saldo),
+    created_at: "",
+    automatico: true,
+  }
+  return [...delTramo, automatico]
+}
+
+/** Primer día del tramo y del tramo anterior; `null` si no tienen inicio. */
+export function iniciosDe(periodo: Filtro) {
+  return {
+    actual: rango(periodo).desde,
+    anterior: rangoAnterior(periodo)?.desde ?? null,
+  }
+}
+
 export function filtrarAnterior(movimientos: Movimiento[], periodo: Filtro) {
   const r = rangoAnterior(periodo)
   if (!r || r.desde === null) return null
@@ -647,6 +706,8 @@ export function datosPeriodo(
   let gastos = 0
   const conceptos = new Set<string>()
   for (const m of movimientos) {
+    // El saldo de antes no es un gasto ni un ingreso de este periodo.
+    if (m.automatico) continue
     if (m.tipo === "gasto") {
       gastos += m.valor
       conceptos.add(claveConcepto(m.concepto))

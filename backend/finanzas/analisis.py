@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from statistics import median
 
+from django.db.models import Sum
+
 from finanzas.calculos import mes_anterior, primer_dia
 from finanzas.conceptos import clave, grupos as grupos_de_sugerencias, mapa
 from finanzas.models import Movimiento, Sugerencia
@@ -38,6 +40,26 @@ class Recurrente:
         return max(0, self.monto - self.pagado_este_mes)
 
 
+def saldo_anterior(mes: date) -> int:
+    """
+    Con cuánto se entra al mes: todo lo que entró menos todo lo que salió
+    antes del día 1. Lo que sobró en septiembre (y lo que venía de agosto…)
+    arranca octubre. Negativo si se viene arrastrando un faltante.
+
+    No se guarda como movimiento: se calcula, así que corregir un gasto viejo
+    cambia solo el saldo de los meses siguientes.
+    """
+    totales = dict(
+        Movimiento.objects.filter(fecha__lt=primer_dia(mes))
+        .values("tipo")
+        .annotate(total=Sum("valor"))
+        .values_list("tipo", "total")
+    )
+    return (totales.get(Movimiento.Tipo.INGRESO) or 0) - (
+        totales.get(Movimiento.Tipo.GASTO) or 0
+    )
+
+
 @dataclass
 class Proyeccion:
     ingresos: int
@@ -47,10 +69,13 @@ class Proyeccion:
     ritmo_diario: int
     dias_restantes: int
     pendientes: list[Recurrente]
+    # Lo que sobró de los meses anteriores y entra a este.
+    saldo_anterior: int = 0
 
     @property
     def balance_final(self) -> int:
-        return self.ingresos_final - self.gastos_final
+        """Con cuánto se terminaría el mes, contando lo que venía de antes."""
+        return self.saldo_anterior + self.ingresos_final - self.gastos_final
 
 
 def _movimientos(desde: date, hasta: date) -> list[Movimiento]:
@@ -163,6 +188,7 @@ def proyeccion(hoy: date, recs: list[Recurrente] | None = None) -> Proyeccion:
         ritmo_diario=round(ritmo),
         dias_restantes=restantes,
         pendientes=pendientes,
+        saldo_anterior=saldo_anterior(mes),
     )
 
 

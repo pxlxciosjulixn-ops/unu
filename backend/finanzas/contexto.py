@@ -129,7 +129,12 @@ def _analisis(hoy, mes, actual: ResumenMes) -> list[str]:
     recs = analisis.recurrentes(hoy)
     p = analisis.proyeccion(hoy, recs)
     lineas.append(
-        f"Proyección al cierre de este mes: ingresos {formato_pesos(p.ingresos_final)}, "
+        f"Saldo con que se entró a este mes (lo que sobró de los anteriores): "
+        f"{formato_pesos(p.saldo_anterior)}. No es un movimiento: se calcula solo."
+    )
+    lineas.append(
+        f"Proyección al cierre de este mes, contando ese saldo: "
+        f"ingresos {formato_pesos(p.ingresos_final)}, "
         f"gastos {formato_pesos(p.gastos_final)}, balance {formato_pesos(p.balance_final)} "
         f"(gasto variable de {formato_pesos(p.ritmo_diario)} por día, "
         f"{p.dias_restantes} días restantes)."

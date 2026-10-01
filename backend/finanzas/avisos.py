@@ -237,6 +237,7 @@ def extras_resumen(mes: date) -> dict:
     siguiente = mes_siguiente(mes)
     return {
         "siguiente": siguiente,
+        "pasa": analisis.saldo_anterior(siguiente),
         "esperado": analisis.estimar_mes(siguiente),
         "topes_pasados": [e for e in analisis.presupuestos(mes) if e.pct > 100],
     }
@@ -280,9 +281,11 @@ def correo_resumen(
             datos.append(
                 (f"Pasó el tope: {e.concepto}", f"{e.pct:.0f} % de {formato_pesos(e.tope)}", False)
             )
+        nombre = nombre_mes(extras["siguiente"])
+        # Lo que sobró (o faltó) de todos los meses hasta este.
+        datos.append((f"Pasa a {nombre}", formato_pesos(extras["pasa"]), True))
         if extras["esperado"]:
             ingresos, gastos = extras["esperado"]
-            nombre = nombre_mes(extras["siguiente"])
             if ingresos:
                 datos.append((f"Ingresos esperados en {nombre}", formato_pesos(ingresos), False))
             datos.append((f"Gastos esperados en {nombre}", formato_pesos(gastos), False))

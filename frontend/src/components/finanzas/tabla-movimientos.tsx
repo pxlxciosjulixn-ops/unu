@@ -211,6 +211,11 @@ export function TablaMovimientos({
                     <span className="block truncate" title={m.concepto}>
                       {m.concepto}
                     </span>
+                    {m.automatico ? (
+                      <span className="block text-xs text-muted-foreground">
+                        Automático: lo que sobró de los meses anteriores
+                      </span>
+                    ) : null}
                     <span className="block text-xs text-muted-foreground tabular-nums sm:hidden">
                       {formatearFechaLocal(m.fecha)}
                     </span>

@@ -1,23 +1,28 @@
 """
-Backup de los movimientos de finanzas (modelo `finanzas.Movimiento`) en JSON.
+Backup de todo lo de finanzas en JSON: movimientos (gastos e ingresos),
+créditos, sugerencias de concepto (con su grupo y presupuesto), avisos de
+correo ya enviados y ajustes de diseño.
 
 Uso, desde cualquier carpeta:
 
     python backup_movimientos.py
 
-Crea `movimientos-AAAAMMDD-HHMMSS.json` junto a este script y, cuando ya
-quedó escrito, borra los backups anteriores de esta carpeta: siempre queda
-solo el más reciente. Lee la base que
-diga `backend/.env` (`DATABASE_URL`: la de Render si está puesta; si no, el
-SQLite local). Solo lee: no cambia nada en la base.
+Crea `finanzas-AAAAMMDD-HHMMSS.json` junto a este script y, cuando ya
+quedó escrito, borra los backups anteriores de esta carpeta (también los
+viejos `movimientos-*.json`, que solo traían los movimientos): siempre queda
+solo el más reciente. Lee la base que diga `backend/.env` (`DATABASE_URL`: la
+de Render si está puesta; si no, el SQLite local). Solo lee: no cambia nada en
+la base.
 
-El archivo sale en el formato de Django, así que se restaura con:
+El contenido lo arma `backend/finanzas/respaldo.py`, el mismo que usa el botón
+"Exportar JSON" del dashboard. Sale en el formato de Django, así que se
+restaura con:
 
     cd backend
-    python manage.py loaddata ../backup/json/movimientos-AAAAMMDD-HHMMSS.json
+    python manage.py loaddata ../backup/json/finanzas-AAAAMMDD-HHMMSS.json
 
-Ojo: `loaddata` escribe con los mismos `id`, así que reemplaza los movimientos
-que ya existan con ese id y agrega los que falten.
+Ojo: `loaddata` escribe con los mismos `id`, así que reemplaza lo que ya
+exista con ese id y agrega lo que falte.
 """
 
 from __future__ import annotations
@@ -31,6 +36,9 @@ from pathlib import Path
 CARPETA = Path(__file__).resolve().parent
 BACKEND = CARPETA.parent.parent / "backend"
 PYTHON_VENV = BACKEND / "env" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+# Los backups de antes (solo movimientos) y los de ahora: de todos queda uno.
+PATRONES = ["finanzas-*.json", "movimientos-*.json"]
 
 
 def usar_el_python_del_backend() -> None:
@@ -56,7 +64,6 @@ def main() -> None:
 
     try:
         import django
-        from django.core import serializers
         from django.db import connection
 
         django.setup()
@@ -66,33 +73,26 @@ def main() -> None:
             f"virtual en {PYTHON_VENV.parent.parent} e instala backend/requirements.txt."
         )
 
-    from finanzas.models import Movimiento
+    from finanzas import respaldo
 
     base = connection.settings_dict
     donde = base.get("HOST") or base.get("NAME")
     print(f"Base: {connection.vendor} ({donde})")
 
-    movimientos = Movimiento.objects.order_by("fecha", "id")
-    total = movimientos.count()
-
-    anteriores = sorted(CARPETA.glob("movimientos-*.json"))
-    destino = CARPETA / f"movimientos-{datetime.now():%Y%m%d-%H%M%S}.json"
+    anteriores = sorted(p for patron in PATRONES for p in CARPETA.glob(patron))
+    destino = CARPETA / f"finanzas-{datetime.now():%Y%m%d-%H%M%S}.json"
     # Se escribe primero en un temporal y se renombra al final: si algo falla
     # a mitad, no queda un JSON cortado y los backups anteriores siguen ahí.
     temporal = destino.with_suffix(".json.tmp")
     # UTF-8 explícito: con la codificación de Windows (cp1252) fallaría con
     # emojis u otros caracteres raros en los conceptos.
     with temporal.open("w", encoding="utf-8") as archivo:
-        serializers.serialize(
-            "json",
-            movimientos,
-            stream=archivo,
-            indent=2,
-            ensure_ascii=False,
-        )
+        cuantos = respaldo.escribir(archivo)
     temporal.replace(destino)
 
-    print(f"{total} movimientos guardados en {destino}")
+    print(f"Guardado en {destino}")
+    for nombre, total in cuantos.items():
+        print(f"  {nombre}: {total}")
 
     # Solo se guarda el último: con el nuevo ya escrito, se borran los viejos.
     for viejo in anteriores:

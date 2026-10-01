@@ -52,6 +52,12 @@ export function ProyeccionMes({ datos }: { datos: Proyeccion | null }) {
           </p>
         </div>
         <dl className="grid grid-cols-2 gap-3 text-sm">
+          <Dato
+            titulo={
+              datos.saldoAnterior < 0 ? "Faltante de antes" : "Saldo de antes"
+            }
+            valor={datos.saldoAnterior}
+          />
           <Dato titulo="Ingresos al cierre" valor={datos.ingresosFinal} />
           <Dato titulo="Gastos al cierre" valor={datos.gastosFinal} />
           <Dato titulo="Llevas gastado" valor={datos.gastos} />
