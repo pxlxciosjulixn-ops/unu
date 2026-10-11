@@ -222,7 +222,7 @@ export function App() {
             }
           />
           <Route
-            path="/ubicacion"
+            path="/conoce-tu-secreto"
             element={
               <Suspense fallback={<CargandoPagina />}>
                 <UbicacionPage />
