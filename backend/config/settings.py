@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "dashboard",
     "resume",
     "finanzas",
+    "ubicacion",
 ]
 
 MIDDLEWARE = [
@@ -187,6 +188,8 @@ REST_FRAMEWORK = {
         "chat": "20/min",
         "login": "10/min",
         "finanzas": "30/min",
+        # Guardar la visita en la pagina de ubicacion.
+        "ubicacion": "20/min",
         # Consulta y subida de chats de WhatsApp para el consejero.
         "analisis": "30/min",
     },

@@ -88,6 +88,20 @@ const ConfiguracionGastosPage = lazy(() =>
   }))
 )
 
+// Página de ubicación: un trabajo de la universidad. La pública toma la IP y,
+// con permiso, el GPS; la de registros (con login) muestra el mapa.
+const UbicacionPage = lazy(() =>
+  import("@/components/ubicacion/ubicacion-page").then((m) => ({
+    default: m.UbicacionPage,
+  }))
+)
+
+const UbicacionRegistrosPage = lazy(() =>
+  import("@/components/ubicacion/registros-page").then((m) => ({
+    default: m.UbicacionRegistrosPage,
+  }))
+)
+
 const LoginPage = lazy(() =>
   import("@/components/auth/login-page").then((m) => ({ default: m.LoginPage }))
 )
@@ -205,6 +219,24 @@ export function App() {
               <Suspense fallback={<CargandoPagina />}>
                 <ConfiguracionGastosPage />
               </Suspense>
+            }
+          />
+          <Route
+            path="/ubicacion"
+            element={
+              <Suspense fallback={<CargandoPagina />}>
+                <UbicacionPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/home/ubicaciones"
+            element={
+              <RutaProtegida>
+                <Suspense fallback={<CargandoPagina />}>
+                  <UbicacionRegistrosPage />
+                </Suspense>
+              </RutaProtegida>
             }
           />
           <Route

@@ -3,6 +3,7 @@ import {
   BotIcon,
   FileTextIcon,
   LayoutDashboardIcon,
+  MapPinIcon,
   LogOutIcon,
   UserIcon,
 } from "lucide-react"
@@ -127,6 +128,25 @@ export function HomeDelLoginPage() {
             >
               <FileTextIcon data-icon="inline-start" />
               Abrir el editor
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ubicaciones registradas</CardTitle>
+            <CardDescription>
+              El mapa de quién abrió el enlace de ubicación y aceptó, con su IP
+              y, si lo permitió, su GPS. Es el trabajo de la universidad.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              nativeButton={false}
+              render={<Link to="/home/ubicaciones" />}
+            >
+              <MapPinIcon data-icon="inline-start" />
+              Ver el mapa
             </Button>
           </CardContent>
         </Card>
