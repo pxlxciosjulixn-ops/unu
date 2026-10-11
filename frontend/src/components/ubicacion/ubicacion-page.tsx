@@ -2,7 +2,6 @@ import * as React from "react"
 import {
   CircleCheckIcon,
   MapPinIcon,
-  ShieldCheckIcon,
   TriangleAlertIcon,
 } from "lucide-react"
 
@@ -35,7 +34,7 @@ type Estado = "aviso" | "procesando" | "listo" | "error"
  * navegador y se registra la visita. Luego se muestra de qué se trata.
  */
 export function UbicacionPage() {
-  const [textos, setTextos] =
+  const [textos] =
     React.useState<TextosUbicacion>(TEXTOS_POR_DEFECTO)
   const [estado, setEstado] = React.useState<Estado>("aviso")
   const [registro, setRegistro] = React.useState<RegistroUbicacion | null>(null)
